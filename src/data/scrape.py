@@ -1,8 +1,10 @@
 import datetime
 import os
 import pickle
-from pathlib import Path
+import random
 import re
+import time
+from pathlib import Path
 
 import dateparser
 import pandas as pd
@@ -71,7 +73,7 @@ class Scraper:
         for key, val in self.results.items():
             regex = {r'category1': r'Biete \/ Suche \/ Tausche: (.+?):',
                      r'bid_ask': r'Biete \/ Suche \/ Tausche: .+?: (.+?) ',
-                     r'rent_buy': r'Biete \/ Suche \/ Tausche: (.+?):',
+                     r'rent_buy': r'Mieten \& Kaufen: (.+?) ',
                      r'rooms': r'Zimmer: ([^a-zA-Z ]+)',
                      r'cost': r'Kosten: ([^a-zA-Z ]+)',
                      r'address': r'Adresse: (.*?)Kontakt',
@@ -120,6 +122,9 @@ class Scraper:
             logger.info('starting scraping')
 
             self.driver.get(self.start_url)
+            for k in range(6):
+                self.driver.execute_script("window.scrollTo(0,document.body.scrollHeight)")
+                time.sleep(abs(random.gauss(1, 1)) + 3)
             content = self.driver.page_source  # this is one big string of webpage html
             soup = BeautifulSoup(content)
             logger.info('soup made')
