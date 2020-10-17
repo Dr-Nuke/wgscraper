@@ -20,3 +20,10 @@ if __name__ == '__main__':
     logger.info('scraping completed')
 
     a=1
+
+# todo: implement unique id of ads. title is insufficient
+# todo: learn squaremeters
+# todo: go to second page, then nth page
+# todo: download only those ads that are not yet in the database
+# todo: make database
+# todo: make one scraper object per website
