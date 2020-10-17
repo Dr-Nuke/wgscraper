@@ -1,12 +1,13 @@
 import datetime
 import os
 import pickle
+import re
 from pathlib import Path
 
+import dateparser
 from bs4 import BeautifulSoup
 from loguru import logger
 from selenium import webdriver
-
 from utils.utils import *
 
 
@@ -36,6 +37,7 @@ class Scraper:
         self.results = {}
         self.root = config['root']
         self.datapath = self.root / 'data'
+        self.driver = webdriver.Firefox(executable_path=self.driverpath)
 
     def scrape(self):
         # for domain in self.domains:
@@ -56,19 +58,52 @@ class Scraper:
                 print('ad')
         self.results = results
 
+        for key, val in self.results.items():
+            self.scrape_ronorp_ad(key)
+
+    def scrape_ronorp_ad(self, key):
+        logger.info(f'scraping ad: {key}')
+        self.driver.get(self.results[key]['href'])
+        content = self.driver.page_source  # this is one big string of webpage html
+        soup = BeautifulSoup(content)
+
+        d = dict()
+        d['owner'] = soup.find(attrs={'class': 'avatar'}).img['title']
+        d['timestamp'] = dateparser.parse(soup.find('div', attrs={'class': 'pull-left'}).string)
+        d['text'] = soup.find('p', attrs={'class': 'text_comment'}).get_text()
+
+        details = soup.find('div', attrs={'class': 'detail_block'})
+        d['category'] = details.contents[1].span.get_text()
+        d['contract'] = details.contents[3].span.contents[5].get_text()
+
+        s = details.contents[5].span.div.get_text()
+        for separator in ['Kosten', 'Adresse']:
+            s = re.sub(separator, ';' + separator, s)
+        d['rooms'], d['cost'], d['adress'] = s.split(';')
+
+        d = {k: Scraper.html_clean_1(v) for k, v in d.items()}
+        self.results[key].update(d)
+
+    def html_clean_1(s):
+        # a specific cleaner for (ronorp) html strings
+        if isinstance(s,str): # don't try to apply regex to timestamps....
+            s = re.sub(r'\n', '', s)  # remove newlines
+            s = re.sub(' +', ' ', s)  # rmove excessive space
+            s = s.strip()
+        return s
 
     def make_or_get_soup(self):
         # get the soup once per 24h. if ran again, load from disk
         if Scraper.time_since_modified(self.soupfile) < 24:
             with open(self.soupfile, 'rb') as f_in:
                 soup_str = pickle.load(f_in)
-                soup = BeautifulSoup(soup_str, 'lxml')
-            logger.info(f'loaded soup from {self.soupfile}')
+                soup = BeautifulSoup(soup_str)
+            logger.info(f'loaded soup from: {self.soupfile}')
         else:
             logger.info('starting scraping')
-            driver = webdriver.Firefox(executable_path=self.driverpath)
-            driver.get(self.start_url)
-            content = driver.page_source  # this is one big string of webpage html
+
+            self.driver.get(self.start_url)
+            content = self.driver.page_source  # this is one big string of webpage html
             soup = BeautifulSoup(content)
             logger.info('soup made')
             with open(self.soupfile, 'wb') as f_out:
