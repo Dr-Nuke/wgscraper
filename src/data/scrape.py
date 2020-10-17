@@ -2,6 +2,7 @@ import datetime
 import os
 import pickle
 from pathlib import Path
+import re
 
 import dateparser
 import pandas as pd
@@ -46,10 +47,8 @@ class Scraper:
         else:
             print(f'There is no scrape() for domain {self.domain}.')
 
-        df_file = self.datapath / 'scraper_df.csv'
-        pd.DataFrame(self.results).transpose().to_csv(df_file)
-
     def scrape_ronorp(self):
+        # the scraper specific for ronorp.net
         self.soupfile = self.datapath / 'soup_ronorp.pk'
         soup = self.make_or_get_soup()
         results = {}
@@ -64,7 +63,36 @@ class Scraper:
         for key, val in self.results.items():
             self.scrape_ronorp_ad(key)
 
+        self.extract_details()
+        self.save_to_csv()
+
+    def extract_details(self):
+        # the details are as of yet only a bunch of string. convert them to meaningful content
+        for key, val in self.results.items():
+            regex = {r'category1': r'Biete \/ Suche \/ Tausche: (.+?):',
+                     r'bid_ask': r'Biete \/ Suche \/ Tausche: .+?: (.+?) ',
+                     r'rent_buy': r'Biete \/ Suche \/ Tausche: (.+?):',
+                     r'rooms': r'Zimmer: ([^a-zA-Z ]+)',
+                     r'cost': r'Kosten: ([^a-zA-Z ]+)',
+                     r'address': r'Adresse: (.*?)Kontakt',
+                     r'duration': r'Vertragsart: (.*?) ',
+                     }
+            d = {}
+            for k, v in regex.items():
+                prop = re.search(v, self.results[key]['details'])
+                if prop is not None:
+                    prop = prop.groups(0)[0]
+                else:
+                    prop = 'unknown'
+                d[k] = prop
+            self.results[key].update(d)
+
+    def save_to_csv(self):
+        df_file = self.datapath / 'scraper_df.csv'
+        pd.DataFrame(self.results).transpose().to_csv(df_file)
+
     def scrape_ronorp_ad(self, key):
+        # the scraper for an individual ad, given its url
         logger.info(f'scraping ad: {key}')
         self.driver.get(self.results[key]['href'])
         content = self.driver.page_source  # this is one big string of webpage html
@@ -77,7 +105,7 @@ class Scraper:
         d['text'] = soup.find('p', attrs={'class': 'text_comment'}).get_text()
 
         details = soup.find('div', attrs={'class': 'detail_block'})
-        d['details'] = details
+        d['details'] = html_clean_1(details.get_text())
 
         self.results[key].update({k: html_clean_1(v) for k, v in d.items()})
 

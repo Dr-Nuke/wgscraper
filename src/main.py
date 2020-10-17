@@ -18,3 +18,5 @@ if __name__ == '__main__':
     s = scrape.Scraper(config)
     s.scrape()
     logger.info('scraping completed')
+
+    a=1
