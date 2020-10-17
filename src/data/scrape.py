@@ -1,10 +1,10 @@
 import datetime
 import os
 import pickle
-import re
 from pathlib import Path
 
 import dateparser
+import pandas as pd
 from bs4 import BeautifulSoup
 from loguru import logger
 from selenium import webdriver
@@ -46,6 +46,9 @@ class Scraper:
         else:
             print(f'There is no scrape() for domain {self.domain}.')
 
+        df_file = self.datapath / 'scraper_df.csv'
+        pd.DataFrame(self.results).transpose().to_csv(df_file)
+
     def scrape_ronorp(self):
         self.soupfile = self.datapath / 'soup_ronorp.pk'
         soup = self.make_or_get_soup()
@@ -68,29 +71,15 @@ class Scraper:
         soup = BeautifulSoup(content)
 
         d = dict()
-        d['owner'] = soup.find(attrs={'class': 'avatar'}).img['title']
+        # d['owner'] = soup.find(attrs={'class': 'avatar'}).img['title']
+        d['owner'] = soup.find(attrs={'class': 'user_info'}).find('div', attrs={'class': 'name'})['title']
         d['timestamp'] = dateparser.parse(soup.find('div', attrs={'class': 'pull-left'}).string)
         d['text'] = soup.find('p', attrs={'class': 'text_comment'}).get_text()
 
         details = soup.find('div', attrs={'class': 'detail_block'})
-        d['category'] = details.contents[1].span.get_text()
-        d['contract'] = details.contents[3].span.contents[5].get_text()
+        d['details'] = details
 
-        s = details.contents[5].span.div.get_text()
-        for separator in ['Kosten', 'Adresse']:
-            s = re.sub(separator, ';' + separator, s)
-        d['rooms'], d['cost'], d['adress'] = s.split(';')
-
-        d = {k: Scraper.html_clean_1(v) for k, v in d.items()}
-        self.results[key].update(d)
-
-    def html_clean_1(s):
-        # a specific cleaner for (ronorp) html strings
-        if isinstance(s,str): # don't try to apply regex to timestamps....
-            s = re.sub(r'\n', '', s)  # remove newlines
-            s = re.sub(' +', ' ', s)  # rmove excessive space
-            s = s.strip()
-        return s
+        self.results[key].update({k: html_clean_1(v) for k, v in d.items()})
 
     def make_or_get_soup(self):
         # get the soup once per 24h. if ran again, load from disk
