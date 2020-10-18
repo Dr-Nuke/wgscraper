@@ -1,6 +1,6 @@
 import re
 from urllib.parse import urlparse
-
+import time
 
 class Container:
     def __init__(self):
@@ -31,3 +31,12 @@ def html_clean_1(s):
 def time_difference(start,end):
     diff = (end - start)
     return diff.seconds
+
+def wait_minimum(f=0,last=None,):
+    # just like time.sleep(f), but shortens the sleeptime in case other processes
+    # took their time since last invocation
+    if last:
+        now = time.time()
+        sleeptime = max(f -(now-last),0)
+        time.sleep(sleeptime)
+    return  time.time()

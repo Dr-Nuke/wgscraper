@@ -2,7 +2,7 @@ import datetime
 import os
 import random
 import re
-import time
+from urllib.parse import urlparse
 
 import pandas as pd
 from bs4 import BeautifulSoup
@@ -54,6 +54,7 @@ class Scraper(Scrapewrapper):
 
     def __init__(self, wrapper, url):
         self.start_url = url
+        self.base_url = urlparse(url).netloc
         self.domain = url_to_domain(self.start_url)
         self.savedir = wrapper.datapath / self.domain
         if not os.path.isdir(self.savedir):
@@ -74,7 +75,7 @@ class Scraper(Scrapewrapper):
     #     return vault
 
     def scrape(self):
-        # for domain in self.domains:
+        # coordinate scraping of a specific website
         self.results = {}
         if self.domain == 'ronorp':
             self.scrape_ronorp()
@@ -87,50 +88,79 @@ class Scraper(Scrapewrapper):
 
     def scrape_ronorp(self):
         # the scraper specific for ronorp.net
-        # let us scrape the main page only once er day, and read from disk
-        # if os.path.isfile(self.indexfile):
-        #     indexfile_ts = datetime.datetime.fromtimestamp(os.stat(self.indexfile)).st_mtime
-        #     if time_difference(datetime.datetime.now,indexfile_ts)/3600 < 24:
-        #
 
-        idx = 0
-        # start with the first indexpage
+
         logger.info(f'starting scraping {self.domain}')
         results = {}
-        self.driver.get(self.start_url)
-        for k in range(1):
-            self.driver.execute_script("window.scrollTo(0,document.body.scrollHeight)")
-            time.sleep(abs(random.gauss(1, 1)) + 3)
-
-        content = self.driver.page_source  # this is one big string of webpage html
-
-        soup = BeautifulSoup(content)
-        fpath = self.save_content(content, 'indexpage')
-
-        # go through the links of the indexpage
-        for i, element in enumerate(soup.find_all(attrs={'class': 'title_comment colored'})):
-            if i > 1:  # debug
+        url_next = self.start_url
+        max_indexpages = 20
+        for i in range(max_indexpages):
+            # start with the first indexpage
+            if not url_next:
                 break
-            try:
-                link = element.a['href']
-            except KeyError:
-                logger.info("could not fetch link from element.a['href']")
-                continue
 
-            if 'href' in self.vault.columns:
-                if link in self.vault['href']:
-                    logger.info(f'already scraped: {link}')
+            self.driver.get(url_next)
+            maxiter = 10
+            last = 0
+            for k in range(maxiter):
+                last = wait_minimum(abs(random.gauss(1, 1)) + 3, last)
+                self.driver.execute_script("window. scrollTo(0,document.body.scrollHeight)")
+                content = self.driver.page_source  # this is one big string of webpage html
+                soup = BeautifulSoup(content)
+                goal = soup.find_all('a', attrs={'class': 'pages_links_href pages_arrow'})
+                if goal:
+                    arrows = [element for element in goal if element['title'] == 'Weiter']
+                    if arrows:
+                        logger.info(f'number of arrows: {len(arrows)}')
+                        try:
+                            url_next = 'https://' + self.base_url + arrows[0]['href']
+                            logger.info(f'found next indexpage: {url_next}')
+                        except:
+                            logger.info('could not extract link for next page')
+                            url_next = None
+
+                        break
+                if k == maxiter-1:
+                    logger.info(f'indexpage {i} {k}: no next page found')
+                    url_next = None
+
+            fpath = self.save_content(content, 'indexpage')
+
+            # go through the links of the indexpage
+            elements = soup.find_all(attrs={'class': 'title_comment colored'})
+            n_elements = len(elements)
+            n_scrapes = 0
+            n_known = 0
+            for j, element in enumerate(elements):
+                # if j > 1:  # debug
+                #     break
+                try:
+                    link = element.a['href']
+                except KeyError:
+                    logger.info("could not fetch link from element.a['href']")
                     continue
 
-            if 'alt' in element.a.attrs:
-                self.results.update({link: element.a.attrs})
-                self.scrape_individual_adpage(link)
-            else:
-                logger.info(f'ad: {link}')
+                if 'href' in self.vault.columns:
+                    if link in self.vault['href'].values:
+                        logger.info(f'already scraped: {link}')
+                        n_known += 1
+                        continue
+
+                if 'alt' in element.a.attrs:
+                    self.results.update({link: element.a.attrs})
+                    self.scrape_individual_adpage(link)
+                    n_scrapes += 1
+                else:
+                    logger.info(f'ad: {link}')
+                    n_elements -= 1
+            if n_elements == n_known:
+                url_next = None
+
+        self.driver.quit()
 
     def scrape_individual_adpage(self, url):
         # the scraper for an individual ad, given its url
-        logger.info(f'scraping ad: {url}')
+        logger.info(f'scraping adpage: {url}')
         now = datetime.datetime.now()
         self.driver.get(url)
         content = self.driver.page_source  # this is one big string of webpage html
