@@ -33,14 +33,7 @@ if __name__ == '__main__':
     # s.scrape()
     logger.info('scraping completed')
 
-# todo: implement unique id of ads. title is insufficient. 1st try: url
-# todo: download only those ads that are not yet in the database
-
-# todo: go to second page, then nth page
+# todo: fix to_csv -> read_csv -> unnamed columns
 
 # todo: learn squaremeters
 # todo: make database
-# todo: make one scraper object per website
-
-# save pages as individual files, along with a database entry. only extract id (original url),
-# timestamp
