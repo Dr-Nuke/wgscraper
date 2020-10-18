@@ -27,3 +27,7 @@ def html_clean_1(s):
         s = re.sub(' +', ' ', s)  # rmove excessive space
         s = s.strip()
     return s
+
+def time_difference(start,end):
+    diff = (end - start)
+    return diff.seconds
