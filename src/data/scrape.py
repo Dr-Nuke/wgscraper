@@ -28,7 +28,7 @@ class Scrapewrapper:
     def get_or_make_vault(self):
         # load the vault file. if not existing, make one.
         if os.path.isfile(self.vaultpath):
-            self.vault = pd.read_csv(self.vaultpath)
+            self.vault = pd.read_csv(self.vaultpath, index_col='index_url')
         else:
             self.vault = pd.DataFrame()
             self.vault.to_csv(self.vaultpath)
@@ -89,7 +89,6 @@ class Scraper(Scrapewrapper):
     def scrape_ronorp(self):
         # the scraper specific for ronorp.net
 
-
         logger.info(f'starting scraping {self.domain}')
         results = {}
         url_next = self.start_url
@@ -120,7 +119,7 @@ class Scraper(Scrapewrapper):
                             url_next = None
 
                         break
-                if k == maxiter-1:
+                if k == maxiter - 1:
                     logger.info(f'indexpage {i} {k}: no next page found')
                     url_next = None
 
@@ -154,6 +153,7 @@ class Scraper(Scrapewrapper):
                     logger.info(f'ad: {link}')
                     n_elements -= 1
             if n_elements == n_known:
+                logger.info('no new ads on this indexpage. not proceeding to next indexpage')
                 url_next = None
 
         self.driver.quit()
