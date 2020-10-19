@@ -1,7 +1,6 @@
 import datetime
 import os
 import random
-import re
 from urllib.parse import urlparse
 
 import pandas as pd
@@ -65,15 +64,6 @@ class Scraper(Scrapewrapper):
         self.vault = wrapper.vault
         self.indexfile = self.savedir / 'indexfile.scrape'
 
-    # def get_or_make_indexvault(self):
-    #     # load the vault file. if not existing, make one.
-    #     if os.path.isfile(self.self.indexvault_path):
-    #         vault = pd.read_csv(self.indexvault_path)
-    #     else:
-    #         vault = pd.DataFrame()
-    #         vault.to_csv(self.indexvault_path)
-    #     return vault
-
     def scrape(self):
         # coordinate scraping of a specific website
         self.results = {}
@@ -123,7 +113,9 @@ class Scraper(Scrapewrapper):
                     logger.info(f'indexpage {i} {k}: no next page found')
                     url_next = None
 
-            fpath = self.save_content(content, 'indexpage')
+            # Todo: make index df for indexpages. or if not, remove
+            # fpath = self.save_content(content, 'indexpage')
+
 
             # go through the links of the indexpage
             elements = soup.find_all(attrs={'class': 'title_comment colored'})
@@ -165,20 +157,10 @@ class Scraper(Scrapewrapper):
         self.driver.get(url)
         content = self.driver.page_source  # this is one big string of webpage html
         fpath = self.save_content(content, 'adpage', ts=now)
-        self.results[url].update({'fname': fpath,
+        self.results[url].update({'domain': self.domain,
+                                  'fname': fpath,
                                   'scrape_ts': now,
                                   'processed': False})
-
-        # d = dict()
-        # # d['owner'] = soup.find(attrs={'class': 'avatar'}).img['title']
-        # d['owner'] = soup.find(attrs={'class': 'user_info'}).find('div', attrs={'class': 'name'})['title']
-        # d['timestamp'] = dateparser.parse(soup.find('div', attrs={'class': 'pull-left'}).string)
-        # d['text'] = soup.find('p', attrs={'class': 'text_comment'}).get_text()
-        #
-        # details = soup.find('div', attrs={'class': 'detail_block'})
-        # d['details'] = html_clean_1(details.get_text())
-        #
-        # self.results[key].update({k: html_clean_1(v) for k, v in d.items()})
 
     def save_content(self, content, prefix, ts=None):
         if not ts:
@@ -188,28 +170,8 @@ class Scraper(Scrapewrapper):
         fpath = self.savedir / fname
         with open(fpath, mode='w', encoding='UTF-8', errors='strict', buffering=1) as f_out:
             f_out.write(content)
+        logger.info(f'saving {fpath}')
         return fpath
-
-    def extract_details(self):
-        # the details are as of yet only a bunch of string. convert them to meaningful content
-        for key, val in self.results.items():
-            regex = {r'category1': r'Biete \/ Suche \/ Tausche: (.+?):',
-                     r'bid_ask': r'Biete \/ Suche \/ Tausche: .+?: (.+?) ',
-                     r'rent_buy': r'Mieten \& Kaufen: (.+?) ',
-                     r'rooms': r'Zimmer: ([^a-zA-Z ]+)',
-                     r'cost': r'Kosten: ([^a-zA-Z ]+)',
-                     r'address': r'Adresse: (.*?)Kontakt',
-                     r'duration': r'Vertragsart: (.*?) ',
-                     }
-            d = {}
-            for k, v in regex.items():
-                prop = re.search(v, self.results[key]['details'])
-                if prop is not None:
-                    prop = prop.groups(0)[0]
-                else:
-                    prop = 'unknown'
-                d[k] = prop
-            self.results[key].update(d)
 
     def save_to_csv(self):
         df_file = self.datapath / 'scraper_df.csv'

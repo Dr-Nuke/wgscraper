@@ -33,7 +33,6 @@ if __name__ == '__main__':
     # s.scrape()
     logger.info('scraping completed')
 
-# todo: fix to_csv -> read_csv -> unnamed columns
 
 # todo: learn squaremeters
 # todo: make database
