@@ -42,3 +42,4 @@ if __name__ == '__main__':
 
 # todo: learn squaremeters
 # todo: make database
+# get timestamp

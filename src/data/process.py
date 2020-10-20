@@ -1,6 +1,8 @@
 import os
 import re
 
+import dateparser
+import numpy as np
 import pandas as pd
 from bs4 import BeautifulSoup
 from loguru import logger
@@ -52,13 +54,17 @@ class Processwrapper:
 
         df_failed = pd.concat(fails)
         logger.info(f'failed to process {len(df_failed)} entries')
-        logger.info(f'for {len(df_to_do)} entries there is no prcessor')
+        logger.info(f'for {len(df_to_do)} entries there is no prcoessor')
 
-        self.df_out = pd.concat([self.df_out, ])
+        self.df_out = pd.concat([self.df_out, df_processed])
         self.df_out.to_csv(self.output)
+        info.logger(f'aded {len(df_processed)} entries to processing output')
 
     def process_ronorp(self, df):
-
+        # process the pending data for the ronorp domain
+        if len(df) == 0:
+            logger.info('no entries for ronorp to process')
+            return df, df, df
         regex = {r'category1': r'Biete \/ Suche \/ Tausche: (.+?):',
                  r'bid_ask': r'Biete \/ Suche \/ Tausche: .+?: (.+?) ',
                  r'rent_buy': r'Mieten \& Kaufen: (.+?) ',
@@ -73,8 +79,10 @@ class Processwrapper:
         df_to_do = df[~ind_ronorp]
         dfs = []
         failed = [False] * len(df)
+        n_iter = len(df)
+        l = Looplogger(n_iter, f'processing {n_iter} entries')
         for i, row in df.iterrows():
-
+            l.log(i)
             try:
                 with open(row['fname'], 'r', encoding='utf-8') as f_in:
                     soup = BeautifulSoup(f_in.read())
@@ -89,11 +97,14 @@ class Processwrapper:
             extracted_details = extract_regex_details(details, regex)
             extracted_details['details'] = details
             extracted_details['text'] = soup.find('p', attrs={'class': 'text_comment'}).get_text()
+            extracted_details['timestamp'] = dateparser.parse(
+                soup.find_all('div', attrs={'class': 'pull-left'})[0].get_text())
 
-            dfs.append(pd.DataFrame(index=[0], data=extracted_details))
+            dfs.append(pd.DataFrame(index=[i], data=extracted_details))
 
+        failed = np.array(failed)
         df_fail = df[failed]
-        df_processed = pd.concat(dfs, axis=0)
+        df_processed = df[~failed].join(pd.concat(dfs), how='left')
 
         return df_processed, df_to_do, df_fail
 

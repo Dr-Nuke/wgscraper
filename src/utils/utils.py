@@ -1,6 +1,7 @@
 import re
 from urllib.parse import urlparse
 import time
+from loguru import logger
 
 class Container:
     def __init__(self):
@@ -40,3 +41,23 @@ def wait_minimum(f=0,last=None,):
         sleeptime = max(f -(now-last),0)
         time.sleep(sleeptime)
     return  time.time()
+
+def loop_logger(i,n,message):
+    if (i%n == 0) and (i!=0):
+        pass
+
+
+class Looplogger:
+
+    def __init__(self, n,message):
+        self.n = n
+        self.counter = 0
+        self.state = 10
+        logger.info(message)
+
+    def log(self, i):
+        #         print(i,self.counter,self.state,self.counter/self.n < self.state/100,(self.counter+1)/self.n >= self.state/100)
+        if (self.counter / self.n < self.state / 100) and ((self.counter + 1) / self.n >= self.state / 100):
+            print(f'{self.state}% ', end='')
+            self.state += 10
+        self.counter += 1
