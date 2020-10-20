@@ -19,7 +19,6 @@ class Scrapewrapper:
         self.root = config['root']
         self.datapath = self.root / 'data'
         self.vaultpath = self.datapath / config['vault']
-        # self.vaultpath_2 = self.datapath / config['vault_2']
         self.get_or_make_vault()
         self.scrapes = {}
         self.urls = config['urls']
@@ -72,7 +71,7 @@ class Scraper(Scrapewrapper):
         # elif self.domain in [implemented]:
         #     do stuff
         else:
-            print(f'There is no scrape() for domain {self.domain}.')
+            print(f'There is no scrape_{self.domain}().')
         self.df = pd.DataFrame(self.results).transpose()
         self.df.index.name = 'index_url'
 
@@ -131,13 +130,12 @@ class Scraper(Scrapewrapper):
                     logger.info("could not fetch link from element.a['href']")
                     continue
 
-                if 'href' in self.vault.columns:
-                    if link in self.vault['href'].values:
-                        logger.info(f'already scraped: {link}')
-                        n_known += 1
-                        continue
-
                 if 'alt' in element.a.attrs:
+                    if 'alt' in self.vault.columns:
+                        if element.a['alt'] in self.vault['alt'].values:
+                            logger.info(f'already scraped: {link}')
+                            n_known += 1
+                            continue
                     self.results.update({link: element.a.attrs})
                     self.scrape_individual_adpage(link)
                     n_scrapes += 1

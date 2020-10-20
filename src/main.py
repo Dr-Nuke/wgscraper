@@ -1,11 +1,14 @@
+import datetime
 import os
 from pathlib import Path
 
+import data.process as process
 import data.scrape as scrape
 from loguru import logger
 
 if __name__ == '__main__':
     # config:
+    logger.add("logfile{time}.log")
     logger.info('starting main scraping')
     # make sure base urls have "https://"
     base_urls = ["https://www.ronorp.net/zuerich/immobilien/wg-zuerich.1220?s=1",
@@ -25,13 +28,16 @@ if __name__ == '__main__':
               'root': Path(os.getcwd()),
               'driverpath': driverpath,
               'vault': 'room_database.csv',
-              'vault_2': 'room_database_2.csv'
+              'processed': 'processed_data.csv',
+              'force_reprocessing': False,
+              'forced_cutoff': datetime.datetime.now() - datetime.timedelta(days=14),
               }
 
-    s = scrape.main(config)
-    # s = scrape.Scraper(config)
-    # s.scrape()
+    # s = scrape.main(config)
     logger.info('scraping completed')
+    t = process.main(config)
+    logger.info('processing completed')
+
 
 
 # todo: learn squaremeters
