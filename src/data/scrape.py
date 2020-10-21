@@ -115,7 +115,6 @@ class Scraper(Scrapewrapper):
             # Todo: make index df for indexpages. or if not, remove
             # fpath = self.save_content(content, 'indexpage')
 
-
             # go through the links of the indexpage
             elements = soup.find_all(attrs={'class': 'title_comment colored'})
             n_elements = len(elements)

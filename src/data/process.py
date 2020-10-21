@@ -110,65 +110,6 @@ class Processwrapper:
         return df_processed, df_to_do, df_fail
 
 
-# class process(Processwrapper):
-#     """
-#     my data processing class
-#     """
-#
-#     def __init__(self, config):
-#         self.input =  # input file
-#
-#         self.savedir = wrapper.datapath / self.domain
-#         if not os.path.isdir(self.savedir):
-#             os.makedirs(self.savedir)
-#
-#         self.driverpath = wrapper.driverpath
-#         self.driver = wrapper.driver
-#         self.vault = wrapper.vault
-#         self.indexfile = self.savedir / 'indexfile.scrape'
-#
-#     def process(self):
-#
-#         if self.domain == 'ronorp':
-#             self.process_ronorp()
-#         else:
-#             logger.info(f'There is no process_{self.domain}().')
-
-
-def extract_details(self):
-    # the details are as of yet only a bunch of string. convert them to meaningful content
-    for key, val in self.results.items():
-        regex = {r'category1': r'Biete \/ Suche \/ Tausche: (.+?):',
-                 r'bid_ask': r'Biete \/ Suche \/ Tausche: .+?: (.+?) ',
-                 r'rent_buy': r'Mieten \& Kaufen: (.+?) ',
-                 r'rooms': r'Zimmer: ([^a-zA-Z ]+)',
-                 r'cost': r'Kosten: ([^a-zA-Z ]+)',
-                 r'address': r'Adresse: (.*?)Kontakt',
-                 r'duration': r'Vertragsart: (.*?) ',
-                 }
-        d = {}
-        for k, v in regex.items():
-            prop = re.search(v, self.results[key]['details'])
-            if prop is not None:
-                prop = prop.groups(0)[0]
-            else:
-                prop = 'unknown'
-            d[k] = prop
-        self.results[key].update(d)
-
-        # d = dict()
-        # # d['owner'] = soup.find(attrs={'class': 'avatar'}).img['title']
-        # d['owner'] = soup.find(attrs={'class': 'user_info'}).find('div', attrs={'class': 'name'})['title']
-        # d['timestamp'] = dateparser.parse(soup.find('div', attrs={'class': 'pull-left'}).string)
-        # d['text'] = soup.find('p', attrs={'class': 'text_comment'}).get_text()
-        #
-        # details = soup.find('div', attrs={'class': 'detail_block'})
-        # d['details'] = html_clean_1(details.get_text())
-        #
-        # self.results[key].update({k: html_clean_1(v) for k, v in d.items()})
-
-
-# seudocode
 def extract_regex_details(text, regex):
     # extract a specific set of ronorp
 

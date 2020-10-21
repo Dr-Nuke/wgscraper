@@ -1,7 +1,9 @@
 import re
-from urllib.parse import urlparse
 import time
+from urllib.parse import urlparse
+
 from loguru import logger
+
 
 class Container:
     def __init__(self):
@@ -29,27 +31,30 @@ def html_clean_1(s):
         s = s.strip()
     return s
 
-def time_difference(start,end):
+
+def time_difference(start, end):
     diff = (end - start)
     return diff.seconds
 
-def wait_minimum(f=0,last=None,):
+
+def wait_minimum(f=0, last=None, ):
     # just like time.sleep(f), but shortens the sleeptime in case other processes
     # took their time since last invocation
     if last:
         now = time.time()
-        sleeptime = max(f -(now-last),0)
+        sleeptime = max(f - (now - last), 0)
         time.sleep(sleeptime)
-    return  time.time()
+    return time.time()
 
-def loop_logger(i,n,message):
-    if (i%n == 0) and (i!=0):
+
+def loop_logger(i, n, message):
+    if (i % n == 0) and (i != 0):
         pass
 
 
 class Looplogger:
 
-    def __init__(self, n,message):
+    def __init__(self, n, message):
         self.n = n
         self.counter = 0
         self.state = 10
