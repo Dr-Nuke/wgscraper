@@ -11,6 +11,8 @@ if __name__ == '__main__':
     logger.add("logfile{time}.log")
     logger.info('starting main scraping')
     # make sure base urls have "https://"
+    configfile = Path(os.getcwd()) / 'configs' / 'config.json'
+
     base_urls = ["https://www.ronorp.net/zuerich/immobilien/wg-zuerich.1220?s=1",
                  "https://www.wgzimmer.ch/wgzimmer/search/mate.html",
                  "https://flatfox.ch/en/search/?east=8.593843904245384&north=47.43131788418717&south=47.33779350769794&west=8.468599767811336"
