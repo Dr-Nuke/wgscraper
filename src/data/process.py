@@ -58,7 +58,7 @@ class Processwrapper:
         logger.info(f'for {len(df_to_do)} entries there is no prcoessor')
 
         self.df_out = pd.concat([self.df_out, df_processed])
-        self.df_out.to_csv(self.output)
+        self.df_out.to_csv(self.output, index=False)
         logger.info(f'added {len(df_processed)} entries to processing output')
 
     def process_ronorp(self, df):
@@ -105,7 +105,8 @@ class Processwrapper:
 
         failed = np.array(failed)
         df_fail = df[failed]
-        df_processed = df[~failed].join(pd.concat(dfs), how='left')
+        self.join = df[~failed].join(pd.concat(dfs), how='left')
+        df_processed = self.join
 
         return df_processed, df_to_do, df_fail
 

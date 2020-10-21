@@ -29,7 +29,7 @@ class Scrapewrapper:
             self.vault = pd.read_csv(self.vaultpath, index_col='index_url')
         else:
             self.vault = pd.DataFrame()
-            self.vault.to_csv(self.vaultpath)
+            self.vault.to_csv(self.vaultpath,index=False)
 
     def scrape_wrap(self):
         # run scraping jobs
@@ -40,9 +40,9 @@ class Scrapewrapper:
             self.scrapes.update({scr.domain: scr.results})
 
             self.vault = pd.concat([self.vault, scr.df], sort=False)
-            scr.df.to_csv(self.vaultpath, mode='a', header=True)
+            scr.df.to_csv(self.vaultpath, mode='a', header=True,index=False)
 
-        self.vault.to_csv(self.vaultpath)
+        self.vault.to_csv(self.vaultpath,index=False)
 
 
 class Scraper(Scrapewrapper):
@@ -150,7 +150,7 @@ class Scraper(Scrapewrapper):
     def scrape_individual_adpage(self, url):
         # the scraper for an individual ad, given its url
         logger.info(f'scraping adpage: {url}')
-        now = datetime.datetime.now()
+        now = datetime.datetime.now().replace(microsecond=0)
         self.driver.get(url)
         content = self.driver.page_source  # this is one big string of webpage html
         fpath = self.save_content(content, 'adpage', ts=now)
@@ -170,9 +170,9 @@ class Scraper(Scrapewrapper):
         logger.info(f'saving {fpath}')
         return fpath
 
-    def save_to_csv(self):
+    def save_to_csv(self,index=False):
         df_file = self.datapath / 'scraper_df.csv'
-        pd.DataFrame(self.results).transpose().to_csv(df_file)
+        pd.DataFrame(self.results).transpose().to_csv(df_file,index=False)
 
 
 def time_since_modified(fname):
