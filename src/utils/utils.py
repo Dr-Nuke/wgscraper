@@ -66,3 +66,10 @@ class Looplogger:
             print(f'{self.state}% ', end='')
             self.state += 10
         self.counter += 1
+
+
+def safe_drop(df, dropcandidates):
+    # safely drop columns from dfs
+    actualcols = df.columns
+    dropcols = [col for col in dropcandidates if col in actualcols]
+    return df.drop(columns=dropcols)

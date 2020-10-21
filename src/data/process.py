@@ -33,7 +33,7 @@ class Processwrapper:
 
     def process(self):
         # run processing jobs
-        logging.info(f'starting processing {self.input}')
+        logger.info(f'starting processing {self.input}')
 
         # first, let's get all the new stuff
         if not self.force_reprocessing:
