@@ -21,6 +21,7 @@ if __name__ == '__main__':
                  "https://housing.justlanded.com/en/Switzerland_Zurich/Flatshare",
                  "https://www.nestpick.com/search?city=zurich&display=grid&order=relevance&page=1&map=3&currency=CHF&location=85682309",
                  "https://www.homegate.ch/rent/apartment/city-zurich/matching-list",
+                 "https://www.kraftwerk1.ch/freie-objekte-neu/freieobjekte.html",
                  ]
     driverpath = Path(r'C:\Users\Bo-user\Downloads\geckodriver-v0.27.0-win64') / 'geckodriver.exe'
 
@@ -33,7 +34,7 @@ if __name__ == '__main__':
               'forced_cutoff': datetime.datetime.now() - datetime.timedelta(days=14),
               }
 
-    # s = scrape.main(config)
+    s = scrape.main(config)
     logger.info('scraping completed')
     t = process.main(config)
     logger.info('processing completed')
@@ -43,3 +44,13 @@ if __name__ == '__main__':
 # todo: learn squaremeters
 # todo: make database
 # get timestamp
+
+"""
+email addresses (for future usage):
+flatshare.mewo@gmail.com
+suite55.kraftwerk@gmail.com
+suite37.kraftwerk1@gmail.com
+mz@mehrals11.ch
+bunterhaufen.d6.2s@gmail.com
+
+"""

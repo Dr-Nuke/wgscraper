@@ -33,6 +33,7 @@ class Processwrapper:
 
     def process(self):
         # run processing jobs
+        logging.info(f'starting processing {self.input}')
 
         # first, let's get all the new stuff
         if not self.force_reprocessing:
@@ -58,7 +59,7 @@ class Processwrapper:
 
         self.df_out = pd.concat([self.df_out, df_processed])
         self.df_out.to_csv(self.output)
-        logger.info(f'aded {len(df_processed)} entries to processing output')
+        logger.info(f'added {len(df_processed)} entries to processing output')
 
     def process_ronorp(self, df):
         # process the pending data for the ronorp domain
