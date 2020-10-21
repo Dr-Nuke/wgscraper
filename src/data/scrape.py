@@ -7,7 +7,7 @@ import pandas as pd
 from bs4 import BeautifulSoup
 from loguru import logger
 from selenium import webdriver
-from utils.utils import *
+import utils.utils as u
 
 
 class Scrapewrapper:
@@ -41,6 +41,7 @@ class Scrapewrapper:
 
             self.vault = pd.concat([self.vault, scr.df], sort=False)
             scr.df.to_csv(self.vaultpath, mode='a', header=True,index=False)
+            loger.info(f'scraped {len(scr.df)} new ads from {scr.domain}')
 
         self.vault.to_csv(self.vaultpath,index=False)
 
@@ -53,7 +54,7 @@ class Scraper(Scrapewrapper):
     def __init__(self, wrapper, url):
         self.start_url = url
         self.base_url = urlparse(url).netloc
-        self.domain = url_to_domain(self.start_url)
+        self.domain = u.url_to_domain(self.start_url)
         self.savedir = wrapper.datapath / self.domain
         if not os.path.isdir(self.savedir):
             os.makedirs(self.savedir)
@@ -91,10 +92,10 @@ class Scraper(Scrapewrapper):
             maxiter = 10
             last = 0
             for k in range(maxiter):
-                last = wait_minimum(abs(random.gauss(1, 1)) + 3, last)
+                last = u.wait_minimum(abs(random.gauss(1, 1)) + 3, last)
                 self.driver.execute_script("window. scrollTo(0,document.body.scrollHeight)")
                 content = self.driver.page_source  # this is one big string of webpage html
-                soup = BeautifulSoup(content)
+                soup = BeautifulSoup(content,'features="html.parser"')
                 goal = soup.find_all('a', attrs={'class': 'pages_links_href pages_arrow'})
                 if goal:
                     arrows = [element for element in goal if element['title'] == 'Weiter']
@@ -189,6 +190,7 @@ def main(config):
     :param config: a dict with config properties
     :return: the scraper wrapper instance
     """
+    logger.info(f'starting scraping')
     sw = Scrapewrapper(config)
     sw.scrape_wrap()
     return sw

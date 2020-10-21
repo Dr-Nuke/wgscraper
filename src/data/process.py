@@ -4,9 +4,9 @@ import re
 import dateparser
 import numpy as np
 import pandas as pd
+import utils.utils as u
 from bs4 import BeautifulSoup
 from loguru import logger
-from utils.utils import *
 
 
 class Processwrapper:
@@ -40,9 +40,14 @@ class Processwrapper:
             # Either Identify what is new in the input
             key_diff = set(self.df_in.index).difference(self.df_out.index)
             df_to_do = self.df_in[self.df_in.index.isin(key_diff)]
+            n = len(self.df_in)
+            n_attempt = len(key_diff)
+            ignored = len(self.df_in) - n_attempt
+            logger.info(f'attempting to process {n_attempt} of {n} entries, ignoring {ignored} existing entries')
         else:
             # or take what came after the cutoff
             df_to_do = self.df_in[self.df_in['scrape_ts'] > self.forced_cutoff]
+            logger.info(f'{self.output} not found. post processing all entries')
 
         processors = [self.process_ronorp,
                       ]
@@ -80,19 +85,19 @@ class Processwrapper:
         df_to_do = df[~ind_ronorp]
         dfs = []
         failed = [False] * len(df)
-        n_iter = len(df)
-        l = Looplogger(n_iter, f'processing {n_iter} entries')
+        n_iter = len(df_processed)
+        l = u.Looplogger(n_iter, f'processing {n_iter} entries')
         for i, row in df.iterrows():
             l.log(i)
             try:
                 with open(row['fname'], 'r', encoding='utf-8') as f_in:
-                    soup = BeautifulSoup(f_in.read())
+                    soup = BeautifulSoup(f_in.read(), 'features="html.parser"')
             except:
                 logger.info(f"could not ingest {row['fname']}")
                 failed[i] = True
                 continue
 
-            details = html_clean_1(soup.find('div', attrs={'class': 'detail_block'}).get_text())
+            details = u.html_clean_1(soup.find('div', attrs={'class': 'detail_block'}).get_text())
             details = details.split('Die vollen', 1)[0]
 
             extracted_details = extract_regex_details(details, regex)
@@ -128,5 +133,6 @@ def extract_regex_details(text, regex):
 
 
 def main(config):
+    logger.info(f'starting processing')
     pw = Processwrapper(config)
     pw.process()

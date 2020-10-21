@@ -21,18 +21,17 @@ if __name__ == '__main__':
               'driverpath': driverpath,  # [/path/to/geckodriver-v0.27.0-win64/geckodriver.exe]
               'vault': 'room_database.csv',
               'processed': 'processed_data.csv',
-              'post_processed': 'processed_data.csv',
+              'post_processed': 'post_processed_data.csv',
               'force_reprocessing': False,
               'forced_cutoff': datetime.datetime.now() - datetime.timedelta(days=14),
               }
 
-    # s = scrape.main(config)
+    s = scrape.main(config)
     logger.info('scraping completed')
     t = process.main(config)
     logger.info('processing completed')
     p = postp.main(config)
 
 # todo: learn squaremeters
-
-# todo: convert numerics (room, rent,...) to numbers
 # todo: investigate, how updates of an ad affect it
+# todo: fix timestamp :seems to confuse monthe & days
