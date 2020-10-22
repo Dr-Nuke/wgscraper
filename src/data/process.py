@@ -4,7 +4,7 @@ import re
 import dateparser
 import numpy as np
 import pandas as pd
-import utils.utils as u
+import src.utils.utils as u
 from bs4 import BeautifulSoup
 from loguru import logger
 

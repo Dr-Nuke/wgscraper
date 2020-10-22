@@ -2,10 +2,9 @@ import datetime
 import os
 from pathlib import Path
 
-
-import data.process as process
-import data.scrape as scrape
-import data.postprocess as postp
+import src.data.process as process
+import src.data.scrape as scrape
+import src.data.postprocess as postp
 from loguru import logger
 
 from configs.config import base_urls, driverpath

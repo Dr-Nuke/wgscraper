@@ -7,7 +7,7 @@ import pandas as pd
 from bs4 import BeautifulSoup
 from loguru import logger
 from selenium import webdriver
-import utils.utils as u
+import src.utils.utils as u
 
 
 class Scrapewrapper:
