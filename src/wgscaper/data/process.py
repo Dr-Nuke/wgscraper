@@ -7,7 +7,7 @@ import pandas as pd
 from bs4 import BeautifulSoup
 from loguru import logger
 
-import src.utils.utils as u
+import src as u
 
 
 class Processwrapper:

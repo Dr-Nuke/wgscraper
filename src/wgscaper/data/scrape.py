@@ -8,7 +8,7 @@ from bs4 import BeautifulSoup
 from loguru import logger
 from selenium import webdriver
 
-import src.utils.utils as u
+import src as u
 
 
 class Scrapewrapper:

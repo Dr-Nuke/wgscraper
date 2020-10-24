@@ -4,10 +4,10 @@ from pathlib import Path
 
 from loguru import logger
 
-import src.data.analysis as analysis
-import src.data.postprocess as postp
-import src.data.process as process
-import src.data.scrape as scrape
+import src.wgscaper.data.analysis as analysis
+import src.wgscaper.data.postprocess as postp
+import src.wgscaper.data.process as process
+import src.wgscaper.data.scrape as scrape
 from configs.config import base_urls, driverpath, searchdict
 
 if __name__ == '__main__':
