@@ -30,7 +30,6 @@ class Scrapewrapper:
             self.vault = pd.read_csv(self.vaultpath)
         else:
             self.vault = pd.DataFrame()
-            self.vault.to_csv(self.vaultpath, index=False)
 
     def scrape_wrap(self):
         # run scraping jobs
@@ -45,6 +44,7 @@ class Scrapewrapper:
             logger.info(f'scraped {len(scr.df)} new ads from {scr.domain}')
 
         self.vault.to_csv(self.vaultpath, index=False)
+        logger.info('scraping completed')
 
 
 class Scraper(Scrapewrapper):
@@ -75,7 +75,7 @@ class Scraper(Scrapewrapper):
         else:
             print(f'There is no scrape_{self.domain}().')
         self.df = pd.DataFrame(self.results).transpose()
-        # self.df.index.name = 'index_url'
+
 
     def scrape_ronorp(self):
         # the scraper specific for ronorp.net
@@ -183,6 +183,8 @@ def time_since_modified(fname):
         return (datetime.datetime.now() - ts).seconds / 3600.0
     else:
         return 100.0
+
+
 
 
 def main(config):

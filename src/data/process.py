@@ -64,8 +64,8 @@ class Processwrapper:
         logger.info(f'for {len(df_to_do)} entries there is no prcoessor')
 
         self.df_out = pd.concat([self.df_out, df_processed])
-        self.df_out.to_csv(self.output, index=False)
-        logger.info(f'added {len(df_processed)} entries to processing output')
+
+        logger.info('processing completed')
 
     def process_ronorp(self, df):
         # process the pending data for the ronorp domain

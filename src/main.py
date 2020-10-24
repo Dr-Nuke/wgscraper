@@ -2,15 +2,15 @@ import datetime
 import os
 from pathlib import Path
 
-import src.data.process as process
-import src.data.scrape as scrape
-import src.data.postprocess as postp
 from loguru import logger
 
+import src.data.analysis as analysis
+import src.data.postprocess as postp
+import src.data.process as process
+import src.data.scrape as scrape
 from configs.config import base_urls, driverpath, searchdict
 
 if __name__ == '__main__':
-
     logger.add("logfile{time}.log")
     logger.info('starting main scraping')
 
@@ -21,17 +21,20 @@ if __name__ == '__main__':
               'vault': 'room_database.csv',
               'processed': 'processed_data.csv',
               'post_processed': 'post_processed_data.csv',
+              'results_archive': 'results_archive.csv',
               'force_reprocessing': False,
               'forced_cutoff': datetime.datetime.now() - datetime.timedelta(days=14),
-              'searchdict': searchdict, # [{'column': 'text', 'pattern': 'spacious', 'flag': 'IGNORECASE'}]
+              'searchdict': searchdict,  # [{'column': 'text', 'pattern': 'spacious', 'flag': 'IGNORECASE'}]
+              'now': datetime.datetime.now().replace(microsecond=0),
               }
 
-    # s = scrape.main(config)
-    logger.info('scraping completed')
-    # t = process.main(config)
-    logger.info('processing completed')
+    s = scrape.main(config)
+    t = process.main(config)
     p = postp.main(config)
+    a = analysis.main(config)
 
+# todo: search the new entries for matches & do email automation
+# todo: fix unnamed:0 from save/load csv
 # todo: add owner to database (processing)
 # todo: learn squaremeters
 # todo: investigate, how updates of an ad affect it

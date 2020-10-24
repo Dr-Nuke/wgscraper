@@ -16,7 +16,7 @@ class Postprocessor:
         if os.path.isfile(self.input):
             self.df_in = pd.read_csv(self.input)
         else:
-            logger.info('no input data')
+            logger.info(f'no input data on {self.input}')
             return None
 
         if os.path.isfile(self.output):
@@ -45,6 +45,9 @@ class Postprocessor:
         #     # or take what came after the cutoff
         #     df_to_do = self.df_in[self.df_in['scrape_ts'] > self.forced_cutoff]
 
+        if len(df_to_do) == 0:
+            logger.info(f'no new entries for post processig in {self.input}')
+            return
         post_processors = [self.postprocess_ronorp,
                            ]
         fails = []
@@ -59,8 +62,12 @@ class Postprocessor:
         logger.info(f'for {len(df_to_do)} entries there is no post-prcoessor')
 
         self.df_out = pd.concat([self.df_out, df_processed])
+        ordercols=['timestamp', 'scrape_ts', 'domain', 'rooms', 'cost', 'address', 'duration',
+                   'bid_ask', 'href', 'title', 'details', 'text', 'category1' ]
+        self.df_out = self.df_out[ordercols]
         self.df_out.to_csv(self.output, index=False)
         logger.info(f'added {len(df_processed)} entries to {self.output}')
+        logger.info('postprocessing completed')
 
     def postprocess_ronorp(self, df):
         if len(df) == 0:
@@ -70,22 +77,6 @@ class Postprocessor:
         df_processed = df[ind_ronorp]
         df_to_do = df[~ind_ronorp]
 
-        # removecrap
-        dropcols = ['index_url',
-                    'class',
-                    'data-attr-href',
-                    'data-trace',
-                    'data-category',
-                    'data-label',
-                    'data-trace',
-                    'data-actions',
-                    'fname',
-                    'data-advert-position',
-                    'bid_ask',
-                    'rent_buy',
-                    'processed',
-                    ]
-        df_processed = u.safe_drop(df_processed, dropcols)
 
         # renaming
         renames = {'alt': 'title',
@@ -94,12 +85,8 @@ class Postprocessor:
 
         # make numericals
         df_processed['cost'] = pd.to_numeric(df_processed['cost'].str.replace("'", ''), errors='coerce')
-        ordercols =[ 'title',  'domain',
-          'rooms', 'cost', 'address', 'duration',
-         'href','details', 'text', 'category1','timestamp','scrape_ts']
 
-
-        return df_processed[ordercols], df_to_do, pd.DataFrame()
+        return df_processed, df_to_do, pd.DataFrame()
 
 
 def main(config):
