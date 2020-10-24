@@ -4,6 +4,8 @@ wgscraper
 A tool to help you find a WG
 currently centered around ronorp zurich
 
+this project was initialized by cookiecutter
+
 Project Organization
 ------------
 
