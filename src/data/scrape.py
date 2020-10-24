@@ -7,6 +7,7 @@ import pandas as pd
 from bs4 import BeautifulSoup
 from loguru import logger
 from selenium import webdriver
+
 import src.utils.utils as u
 
 
@@ -26,10 +27,10 @@ class Scrapewrapper:
     def get_or_make_vault(self):
         # load the vault file. if not existing, make one.
         if os.path.isfile(self.vaultpath):
-            self.vault = pd.read_csv(self.vaultpath, index_col='index_url')
+            self.vault = pd.read_csv(self.vaultpath)
         else:
             self.vault = pd.DataFrame()
-            self.vault.to_csv(self.vaultpath,index=False)
+            self.vault.to_csv(self.vaultpath, index=False)
 
     def scrape_wrap(self):
         # run scraping jobs
@@ -40,10 +41,10 @@ class Scrapewrapper:
             self.scrapes.update({scr.domain: scr.results})
 
             self.vault = pd.concat([self.vault, scr.df], sort=False)
-            scr.df.to_csv(self.vaultpath, mode='a', header=True,index=False)
-            loger.info(f'scraped {len(scr.df)} new ads from {scr.domain}')
+            scr.df.to_csv(self.vaultpath, mode='a', header=True, index=False)
+            logger.info(f'scraped {len(scr.df)} new ads from {scr.domain}')
 
-        self.vault.to_csv(self.vaultpath,index=False)
+        self.vault.to_csv(self.vaultpath, index=False)
 
 
 class Scraper(Scrapewrapper):
@@ -74,7 +75,7 @@ class Scraper(Scrapewrapper):
         else:
             print(f'There is no scrape_{self.domain}().')
         self.df = pd.DataFrame(self.results).transpose()
-        self.df.index.name = 'index_url'
+        # self.df.index.name = 'index_url'
 
     def scrape_ronorp(self):
         # the scraper specific for ronorp.net
@@ -95,7 +96,7 @@ class Scraper(Scrapewrapper):
                 last = u.wait_minimum(abs(random.gauss(1, 1)) + 3, last)
                 self.driver.execute_script("window. scrollTo(0,document.body.scrollHeight)")
                 content = self.driver.page_source  # this is one big string of webpage html
-                soup = BeautifulSoup(content,'features="html.parser"')
+                soup = BeautifulSoup(content, features="html.parser")
                 goal = soup.find_all('a', attrs={'class': 'pages_links_href pages_arrow'})
                 if goal:
                     arrows = [element for element in goal if element['title'] == 'Weiter']
@@ -171,9 +172,9 @@ class Scraper(Scrapewrapper):
         logger.info(f'saving {fpath}')
         return fpath
 
-    def save_to_csv(self,index=False):
+    def save_to_csv(self, index=False):
         df_file = self.datapath / 'scraper_df.csv'
-        pd.DataFrame(self.results).transpose().to_csv(df_file,index=False)
+        pd.DataFrame(self.results).transpose().to_csv(df_file, index=False)
 
 
 def time_since_modified(fname):

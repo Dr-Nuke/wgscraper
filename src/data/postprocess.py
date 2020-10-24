@@ -33,7 +33,7 @@ class Postprocessor:
         # Either Identify what is new in the input
         if 'title' in self.df_out.columns:
             key_diff = set(self.df_in.alt).difference(self.df_out.title)
-            df_to_do = self.df_in[self.df_in.index.isin(key_diff)]
+            df_to_do = self.df_in[self.df_in['alt'].isin(key_diff)]
             n=len(self.df_in)
             n_attempt=len(key_diff)
             ignored = len(self.df_in) - n_attempt
@@ -83,7 +83,7 @@ class Postprocessor:
                     'data-advert-position',
                     'bid_ask',
                     'rent_buy',
-
+                    'processed',
                     ]
         df_processed = u.safe_drop(df_processed, dropcols)
 
@@ -96,7 +96,7 @@ class Postprocessor:
         df_processed['cost'] = pd.to_numeric(df_processed['cost'].str.replace("'", ''), errors='coerce')
         ordercols =[ 'title',  'domain',
           'rooms', 'cost', 'address', 'duration',
-         'href','details', 'text', 'category1','timestamp','scrape_ts','processed']
+         'href','details', 'text', 'category1','timestamp','scrape_ts']
 
 
         return df_processed[ordercols], df_to_do, pd.DataFrame()

@@ -4,9 +4,10 @@ import re
 import dateparser
 import numpy as np
 import pandas as pd
-import src.utils.utils as u
 from bs4 import BeautifulSoup
 from loguru import logger
+
+import src.utils.utils as u
 
 
 class Processwrapper:
@@ -91,7 +92,7 @@ class Processwrapper:
             l.log(i)
             try:
                 with open(row['fname'], 'r', encoding='utf-8') as f_in:
-                    soup = BeautifulSoup(f_in.read(), 'features="html.parser"')
+                    soup = BeautifulSoup(f_in.read(), features="html.parser")
             except:
                 logger.info(f"could not ingest {row['fname']}")
                 failed[i] = True

@@ -7,7 +7,7 @@ import src.data.scrape as scrape
 import src.data.postprocess as postp
 from loguru import logger
 
-from configs.config import base_urls, driverpath
+from configs.config import base_urls, driverpath, searchdict
 
 if __name__ == '__main__':
 
@@ -23,14 +23,18 @@ if __name__ == '__main__':
               'post_processed': 'post_processed_data.csv',
               'force_reprocessing': False,
               'forced_cutoff': datetime.datetime.now() - datetime.timedelta(days=14),
+              'searchdict': searchdict, # [{'column': 'text', 'pattern': 'spacious', 'flag': 'IGNORECASE'}]
               }
 
-    s = scrape.main(config)
+    # s = scrape.main(config)
     logger.info('scraping completed')
-    t = process.main(config)
+    # t = process.main(config)
     logger.info('processing completed')
     p = postp.main(config)
 
+# todo: add owner to database (processing)
 # todo: learn squaremeters
 # todo: investigate, how updates of an ad affect it
 # todo: fix timestamp :seems to confuse monthe & days
+# todo: fix
+# todo: add login to fetch contact details
