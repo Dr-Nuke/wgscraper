@@ -95,3 +95,4 @@ target/
 *.ipynb
 
 /notebooks/
+/dist/

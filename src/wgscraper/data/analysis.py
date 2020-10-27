@@ -43,9 +43,6 @@ class Analysis:
         else:
             df_to_do = self.df_in
             logger.info(f'{self.output} not found. post processing all entries')
-        # else:
-        #     # or take what came after the cutoff
-        #     df_to_do = self.df_in[self.df_in['scrape_ts'] > self.forced_cutoff]
 
         if len(df_to_do) == 0:
             logger.info(f'no new entries for analysis in {self.input}')
@@ -62,17 +59,24 @@ class Analysis:
 
         result = pd.concat(results).drop_duplicates(subset=['title'])
         result = result[result['bid_ask'] == 'Biete']
+        result = result[result['duration'] == 'unbefristet']
         self.result = result
+        if len(result) == 0:
+            logger.info(f'no new results fo analysis in {self.input}')
+            return
+
+
 
         fname = self.resultspath / ('results_' + self.now.strftime('%Y_%m_%d__%H_%M_%S') + '.csv')
         self.result_file_name = fname
         self.df_out = pd.concat([self.df_out, result], axis=0)
 
-        logger.info(f'added {len(result)} entries to {self.output}')
+        logger.info(f'added {len(result)} search results to {self.output}')
 
     def save_to_csv(self):
-        self.result.to_csv(self.result_file_name, index=False)
-        self.df_out.to_csv(self.output, index=False)
+        if len(self.result)!=0:
+            self.result.to_csv(self.result_file_name, index=False)
+            self.df_out.to_csv(self.output, index=False)
 
 
 def main(config):

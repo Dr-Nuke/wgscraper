@@ -7,7 +7,7 @@ import pandas as pd
 from bs4 import BeautifulSoup
 from loguru import logger
 
-import src as u
+import utils.utils as u
 
 
 class Processwrapper:
@@ -61,7 +61,7 @@ class Processwrapper:
 
         df_failed = pd.concat(fails)
         logger.info(f'failed to process {len(df_failed)} entries')
-        logger.info(f'for {len(df_to_do)} entries there is no prcoessor')
+        logger.info(f'for {len(df_to_do)} entries there is no processor')
 
         self.df_out = pd.concat([self.df_out, df_processed])
 
@@ -113,8 +113,12 @@ class Processwrapper:
         df_fail = df[failed]
         self.join = df[~failed].join(pd.concat(dfs), how='left')
         df_processed = self.join
+        logger.info(f'processed {len(df_processed)} enries from ronorp')
 
         return df_processed, df_to_do, df_fail
+
+    def to_csv(self):
+        self.df_out.to_csv(self.output, index=False)
 
 
 def extract_regex_details(text, regex):
@@ -133,7 +137,9 @@ def extract_regex_details(text, regex):
     return d
 
 
+
 def main(config):
     logger.info(f'starting processing')
     pw = Processwrapper(config)
     pw.process()
+    pw.to_csv()

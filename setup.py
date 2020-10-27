@@ -1,9 +1,10 @@
 #!/usr/bin/env python
 # -*- encoding: utf-8 -*-
-import io
-
 from __future__ import absolute_import
 from __future__ import print_function
+
+import io
+
 from glob import glob
 from os.path import basename
 from os.path import dirname
