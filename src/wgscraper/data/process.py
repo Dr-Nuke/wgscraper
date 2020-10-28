@@ -14,7 +14,7 @@ class Processwrapper:
     # a wrapper class for the individual processing stage
     def __init__(self, config):
         self.root = config['root']
-        self.datapath = self.root / 'data'
+        self.datapath = config['datapath']
         self.input = self.datapath / config['vault']
         self.output = self.datapath / config['processed']
 

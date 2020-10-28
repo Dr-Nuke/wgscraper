@@ -8,7 +8,7 @@ class Postprocessor:
     # a simple class to host the postprocessing
     def __init__(self, config):
         self.root = config['root']
-        self.datapath = self.root / 'data'
+        self.datapath = config['datapath']
         self.input = self.datapath / config['processed']
         self.output = self.datapath / config['post_processed']
 

@@ -18,7 +18,7 @@ class Scrapewrapper:
         self.driverpath = config['driverpath']
         self.driver = webdriver.Firefox(executable_path=self.driverpath)
         self.root = config['root']
-        self.datapath = self.root / 'data'
+        self.datapath = config['datapath']
         self.vaultpath = self.datapath / config['vault']
         self.get_or_make_vault()
         self.scrapes = {}
@@ -28,6 +28,7 @@ class Scrapewrapper:
         # load the vault file. if not existing, make one.
         if os.path.isfile(self.vaultpath):
             self.vault = pd.read_csv(self.vaultpath)
+            logger.info(f'found {len(self.vault)} pre-existing entries')
         else:
             self.vault = pd.DataFrame()
 
@@ -114,9 +115,6 @@ class Scraper(Scrapewrapper):
                     logger.info(f'indexpage {i} {k}: no next page found')
                     url_next = None
 
-            # Todo: make index df for indexpages. or if not, remove
-            # fpath = self.save_content(content, 'indexpage')
-
             # go through the links of the indexpage
             elements = soup.find_all(attrs={'class': 'title_comment colored'})
             n_elements = len(elements)
@@ -148,6 +146,9 @@ class Scraper(Scrapewrapper):
                 url_next = None
 
         self.driver.quit()
+
+    def scrapw_wgzimmer(self):
+        pass
 
     def scrape_individual_adpage(self, url):
         # the scraper for an individual ad, given its url
