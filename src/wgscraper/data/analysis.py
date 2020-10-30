@@ -52,7 +52,7 @@ class Analysis:
 
         if len(df_to_do) == 0:
             logger.info(f'no new entries for analysis in {self.input_path}')
-            return None
+
 
         results = []
         for search in self.searchdict:
@@ -77,7 +77,7 @@ class Analysis:
         self.result = result
         if len(result) == 0:
             logger.info(f'no new results fo analysis in {self.input_path}')
-            return
+
 
         fname = self.results_path / ('results_' + self.now.strftime('%Y_%m_%d__%H_%M_%S') + '.csv')
         self.result_file_name = fname
@@ -87,9 +87,10 @@ class Analysis:
 
 
     def save_to_csv(self):
-        if len(self.result)!=0:
-            self.output_df.to_csv(self.analyzed_path, index=False)
-            self.result.to_csv(self.result_file_name, index=False)
+
+        self.output_df.to_csv(self.analyzed_path, index=False)
+        self.result.to_csv(self.result_file_name, index=False)
+        if len(self.result) != 0:
             self.result.to_csv(self.output_path, index=False)
 
 

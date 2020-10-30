@@ -19,16 +19,17 @@ import src.wgscraper.data.scrape as scrape
 
 
 if __name__ == '__main__':
-    logger.add("logfile{time}.log")
+    lofgilepath = Path(r'C:\coding\wgscraper\logs')
+    logger.add(lofgilepath / "logfile{time}.log")
     logger.info('starting main scraping')
 
-    s = scrape.main(config)
-    t = process.main(config)
-    p = postp.main(config)
+    # s = scrape.main(config)
+    # t = process.main(config)
+    # p = postp.main(config)
     a = analysis.main(config)
 
 print('end')
-# todo: get proper status bar for
+# todo: get proper status bar for longerprocessings
 # todo: make headerless
 # todo: make config an argument, as well as the pipeline
 # todo: search the new entries for matches & do email automation
