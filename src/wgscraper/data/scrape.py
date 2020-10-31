@@ -1,18 +1,17 @@
 import datetime
 import os
 import random
+import time
 from urllib.parse import urlparse
 
+import dateparser
 import pandas as pd
+import requests
+import utils.utils as u
 from bs4 import BeautifulSoup
 from loguru import logger
 from selenium import webdriver
-import requests
-import time
 from selenium.webdriver.support.ui import Select
-import dateparser
-
-import utils.utils as u
 
 
 class Scrapewrapper:
@@ -27,6 +26,7 @@ class Scrapewrapper:
         self.get_or_make_vault()
         self.scrapes = {}
         self.urls = config['urls']
+        self.specific = config['specific_configs']
 
     def get_or_make_vault(self):
         # load the vault file. if not existing, make one.
@@ -69,37 +69,44 @@ class Scraper(Scrapewrapper):
         self.driver = wrapper.driver
         self.vault = wrapper.vault
         self.indexfile = self.savedir / 'indexfile.scrape'
+        self.specific = wrapper.specific
 
     def scrape(self):
         # coordinate scraping of a specific website
         self.results = {}
         if self.domain == 'ronorp':
-            self.scrape_ronorp()
-        # elif self.domain == 'wgzimmer':
-        #     self.scrape_wgzimmer()
+            # self.scrape_ronorp()
+            pass
+        elif self.domain == 'wgzimmer':
+            self.scrape_wgzimmer()
         # elif self.domain in [implemented]:
         #     do stuff
         else:
-            print(f'There is no scrape_{self.domain}().')
-        self.df = pd.DataFrame(self.results).transpose()
+            print(f'There is no scrape_{self.domain}() implemented yet.')
 
+        results_df = pd.DataFrame(self.results).transpose()
+        results_df['href'] = results_df.index
+        results_df = results_df.reset_index(drop=True)
+        self.df = results_df
 
     def scrape_ronorp(self):
         # the scraper specific for ronorp.net
-
         logger.info(f'starting scraping {self.domain}')
         results = {}
         url_next = self.start_url
+
+        # go through all indexpages
         max_indexpages = 20
         for i in range(max_indexpages):
             # start with the first indexpage
             if not url_next:
                 break
-
+            # get the head of the indexpage
             self.driver.get(url_next)
+            # go through index page, make everything load, and find link to next index page
             maxiter = 10
             last = 0
-            for k in range(maxiter):
+            for k in range(maxiter):  # scroll down up to maxiter times
                 last = u.wait_minimum(abs(random.gauss(1, 1)) + 3, last)
                 self.driver.execute_script("window. scrollTo(0,document.body.scrollHeight)")
                 content = self.driver.page_source  # this is one big string of webpage html
@@ -121,7 +128,7 @@ class Scraper(Scrapewrapper):
                     logger.info(f'indexpage {i} {k}: no next page found')
                     url_next = None
 
-            # go through the links of the indexpage
+            # now the indexpage is fully loaded. go through the links of the indexpage
             elements = soup.find_all(attrs={'class': 'title_comment colored'})
             n_elements = len(elements)
             n_scrapes = 0
@@ -135,6 +142,7 @@ class Scraper(Scrapewrapper):
                     logger.info("could not fetch link from element.a['href']")
                     continue
 
+                # 'alt' was the characteristic element name that contained the link & values
                 if 'alt' in element.a.attrs:
                     if 'alt' in self.vault.columns:
                         if element.a['alt'] in self.vault['alt'].values:
@@ -142,7 +150,7 @@ class Scraper(Scrapewrapper):
                             n_known += 1
                             continue
                     self.results.update({link: element.a.attrs})
-                    self.scrape_individual_adpage_ronorp(link)
+                    self.scrape_individual_adpage(link)
                     n_scrapes += 1
                 else:
                     logger.info(f'ad: {link}')
@@ -153,16 +161,26 @@ class Scraper(Scrapewrapper):
 
         self.driver.quit()
 
-    def scrape_individual_adpage_ronorp(self, url):
+    def scrape_individual_adpage(self, url):
         # the scraper for an individual ad, given its url
         logger.info(f'scraping adpage: {url}')
-        now = datetime.datetime.now().replace(microsecond=0)
-        self.driver.get(url)
-        content = self.driver.page_source  # this is one big string of webpage html
-        fpath = self.save_content(content, 'adpage', ts=now)
+        now = datetime.datetime.now()
+        # self.driver.get(url)
+        # content = self.driver.page_source  # this is one big string of webpage html
+        content = requests.get(url)
+        if not content.status_code == 200:
+            for i in range(3):
+                time.sleep(5)
+                content = requests.get(url)
+                if content.status_code == 200:
+                    continue
+            logger.info(f'url returned status code {content.status_code}: {url}')
+            fpath = None
+        else:
+            fpath = self.save_content(content.text, 'adpage', ts=now)
         self.results[url].update({'domain': self.domain,
                                   'fname': fpath,
-                                  'scrape_ts': now,
+                                  'scrape_ts': now.replace(microsecond=0),
                                   })
 
     def save_content(self, content, prefix, ts=None):
@@ -177,117 +195,84 @@ class Scraper(Scrapewrapper):
         return fpath
 
     def scrape_wgzimmer(self):
-        # the scraper specific for wgzimmer.ch
+        logger.info('scraping wgzimmer.ch')
+        base_sleeptime = 0.5
+        regions = self.specific['wgzimmer']['regions']
+        result_dfs = [] # todo: do we use this list?
+        for region in regions:
+            # go to landing page
+            self.driver.get(self.start_url)
+            time.sleep(base_sleeptime)
 
-        logger.info(f'starting scraping {self.domain}')
-        results = {}
-        base_url = self.start_url
-
-        wgzimmer_regions = ['zurich-stadt',
-                            'zurich-altstetten',
-                            'zurich-oerlikon']
-        for region in wgzimmer_regions:
-            self.driver.get(base_url)
+            # pick region & setting
             select = Select(self.driver.find_element_by_id('selector-state'))
-            time.wait(0.5)
-            # select the region
+            time.sleep(base_sleeptime)
             select.select_by_value(region)
-            time.wait(0.5)
-            # select all for permanent/temporary
+            time.sleep(base_sleeptime)
             self.driver.find_element_by_id('permanentall').click()
-            # submit
-            a = self.driver.find_element_by_class_name("button-wrapper.button-etapper")
+
+            # open next page (here the first index page)
+            next_page = "button-wrapper.button-etapper"
+            a = self.driver.find_element_by_class_name(next_page)
             a.find_element_by_xpath('input').click()
+            # get html text
             html_from_page = self.driver.page_source
-            soup = BeautifulSoup(html_from_page, 'html.parser')
-            adlist = soup.find('ul', attrs={'id': 'search-result-list'})
-            list_entries = adlist.find_all('li', attrs={'class': 'search-result-entry search-mate-entry'})
 
-            # get indexpage links
+            # go through all indexpages
+            max_indexpages = 10
+            for i in range(max_indexpages):
+                if not html_from_page:
+                    break
 
-            dfs = []
-            for entry in list_entries:
-                hrefobj = entry.find(
-                    lambda tag: (tag.name == "a") and
-                                ({'href'} == set(tag.attrs.keys())))
-                ad_dict = {}
-                timestampstr = hrefobj.find('span', attrs={'class': 'create-date left-image-result'}).text
-                ad_dict['timestamp'] = dateparser.parse(u.html_clean_1(timestampstr), date_formats=['%d/%m/%Y'])
-                ad_dict['href'] = 'https://www.wgzimmer.ch' + hrefobj['href']
-                dfs.append(pd.DataFrame(index=[0], data=ad_dict))
-            ads_df = pd.concat(dfs).reset_index(drop=True)
+                # go through the next page and save the links
+                soup = BeautifulSoup(html_from_page, 'html.parser')
+                adlist = soup.find('ul', attrs={'id': 'search-result-list'})
+                list_entries = adlist.find_all('li', attrs={'class': 'search-result-entry search-mate-entry'})
+                n_elements = len(list_entries)
+                n_scrapes = 0
+                n_known = 0
+                last = 0
+                for i, entry in enumerate(list_entries):
+                    last = u.wait_minimum(abs(random.gauss(1, 1)) + 3, last)
+                    hrefobj = entry.find(
+                        lambda tag: (tag.name == "a") and
+                                    ({'href'} == set(tag.attrs.keys())))
 
+                    link = 'https://www.wgzimmer.ch' + hrefobj['href']
+                    if link in self.vault['href'].values:
+                        logger.info(f'already scraped: {link}')
+                        n_known += 1
+                        continue
 
+                    # update single-page-result
+                    timestampstr = hrefobj.find('span', attrs={'class': 'create-date left-image-result'}).text
+                    timestamp = dateparser.parse(u.html_clean_1(timestampstr), date_formats=['%d/%m/%Y'])
 
+                    self.results.update({link: {'timestamp': timestamp}
+                                         })
+                    self.scrape_individual_adpage(link)
+                    n_scrapes += 1
 
-        max_indexpages = 20
-        url_next = 'todo'
-        for i in range(max_indexpages):
-            # start with the first indexpage
-            if not url_next:
-                break
-
-            self.driver.get(url_next)
-            maxiter = 10
-            last = 0
-            for k in range(maxiter):
-                last = u.wait_minimum(abs(random.gauss(1, 1)) + 3, last)
-                self.driver.execute_script("window. scrollTo(0,document.body.scrollHeight)")
-                content = self.driver.page_source  # this is one big string of webpage html
-                soup = BeautifulSoup(content, features="html.parser")
-                goal = soup.find_all('a', attrs={'class': 'pages_links_href pages_arrow'})
-                if goal:
-                    arrows = [element for element in goal if element['title'] == 'Weiter']
-                    if arrows:
-                        logger.info(f'number of arrows: {len(arrows)}')
-                        try:
-                            url_next = 'https://' + self.base_url + arrows[0]['href']
-                            logger.info(f'found next indexpage: {url_next}')
-                        except:
-                            logger.info('could not extract link for next page')
-                            url_next = None
-
-                        break
-                if k == maxiter - 1:
-                    logger.info(f'indexpage {i} {k}: no next page found')
+                if n_elements == n_known:
+                    logger.info('no new ads on this indexpage. not proceeding to next indexpage')
                     url_next = None
 
-            # go through the links of the indexpage
-            elements = soup.find_all(attrs={'class': 'title_comment colored'})
-            n_elements = len(elements)
-            n_scrapes = 0
-            n_known = 0
-            for j, element in enumerate(elements):
-                # if j > 1:  # debug
-                #     break
-                try:
-                    link = element.a['href']
-                except KeyError:
-                    logger.info("could not fetch link from element.a['href']")
-                    continue
+                # check for next indexpage
+                next_page = self.driver.find_elements_by_id("gtagSearchresultNextPage")
 
-                if 'alt' in element.a.attrs:
-                    if 'alt' in self.vault.columns:
-                        if element.a['alt'] in self.vault['alt'].values:
-                            logger.info(f'already scraped: {link}')
-                            n_known += 1
-                            continue
-                    self.results.update({link: element.a.attrs})
-                    self.scrape_individual_adpage_ronorp(link)
-                    n_scrapes += 1
+                if  (len(next_page) > 0):
+                    next_page[0].click()
+                    html_from_page = self.driver.page_source
+                    logger.info('going to next indexpage')
                 else:
-                    logger.info(f'ad: {link}')
-                    n_elements -= 1
-            if n_elements == n_known:
-                logger.info('no new ads on this indexpage. not proceeding to next indexpage')
-                url_next = None
+                    # or abort
+                    html_from_page = None
+                    logger.info('no more button to next indexpage. prabaly last page')
 
         self.driver.quit()
 
     def scrapw_wgzimmer(self):
         pass
-
-
 
     def save_to_csv(self, index=False):
         df_file = self.datapath / 'scraper_df.csv'
@@ -300,8 +285,6 @@ def time_since_modified(fname):
         return (datetime.datetime.now() - ts).seconds / 3600.0
     else:
         return 100.0
-
-
 
 
 def main(config):

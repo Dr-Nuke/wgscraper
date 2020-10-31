@@ -23,12 +23,15 @@ if __name__ == '__main__':
     logger.add(lofgilepath / "logfile{time}.log")
     logger.info('starting main scraping')
 
-    # s = scrape.main(config)
+    s = scrape.main(config)
     # t = process.main(config)
     # p = postp.main(config)
-    a = analysis.main(config)
+    # a = analysis.main(config)
 
 print('end')
+
+# reduce ronorp scraping junk appearing in the df
+# toto: add configurable websites i.i. which one to scrape
 # todo: get proper status bar for longerprocessings
 # todo: make headerless
 # todo: make config an argument, as well as the pipeline
@@ -40,3 +43,5 @@ print('end')
 # todo: fix timestamp :seems to confuse monthe & days
 # todo: fix
 # todo: add login to fetch contact details
+# toto: add owner (ronorp, wgzimmer)
+
