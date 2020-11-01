@@ -30,8 +30,9 @@ if __name__ == '__main__':
 
 print('end')
 
-# reduce ronorp scraping junk appearing in the df
-# toto: add configurable websites i.i. which one to scrape
+# todo: make an archive to dump old entries of any table
+# todo: reduce ronorp scraping junk appearing in the df
+# todo: add configurable websites i.i. which one to scrape
 # todo: get proper status bar for longerprocessings
 # todo: make headerless
 # todo: make config an argument, as well as the pipeline
@@ -44,4 +45,5 @@ print('end')
 # todo: fix
 # todo: add login to fetch contact details
 # toto: add owner (ronorp, wgzimmer)
+# toto: fix driver stop vs driver quit
 

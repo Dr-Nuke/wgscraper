@@ -23,18 +23,9 @@ class Scrapewrapper:
         self.root = config['root']
         self.datapath = config['datapath']
         self.vaultpath = self.datapath / config['vault']
-        self.get_or_make_vault()
         self.scrapes = {}
         self.urls = config['urls']
         self.specific = config['specific_configs']
-
-    def get_or_make_vault(self):
-        # load the vault file. if not existing, make one.
-        if os.path.isfile(self.vaultpath):
-            self.vault = pd.read_csv(self.vaultpath)
-            logger.info(f'found {len(self.vault)} pre-existing entries')
-        else:
-            self.vault = pd.DataFrame()
 
     def scrape_wrap(self):
         # run scraping jobs
@@ -42,13 +33,14 @@ class Scrapewrapper:
         for url in self.urls:
             scr = Scraper(self, url)
             scr.scrape()
-            self.scrapes.update({scr.domain: scr.results})
 
-            self.vault = pd.concat([self.vault, scr.df], sort=False)
-            scr.df.to_csv(self.vaultpath, mode='a', header=True, index=False)
-            logger.info(f'scraped {len(scr.df)} new ads from {scr.domain}')
+            if len(scr.results) > 0:
+                scr.results_df = pd.concat(scr.results)
+                scr.vault = pd.concat([scr.vault, scr.results_df])
+                scr.vault.to_csv(scr.vaultpath, index=False)
+            logger.info(f'scraped {len(scr.results)} new ads from {scr.domain}')
 
-        self.vault.to_csv(self.vaultpath, index=False)
+        self.driver.quit()
         logger.info('scraping completed')
 
 
@@ -67,15 +59,28 @@ class Scraper(Scrapewrapper):
 
         self.driverpath = wrapper.driverpath
         self.driver = wrapper.driver
-        self.vault = wrapper.vault
+        self.vaultpath = wrapper.vaultpath.parent / (f'{wrapper.vaultpath.name}_{self.domain}.csv')
+        self.vault = self.get_or_make_vault()
         self.indexfile = self.savedir / 'indexfile.scrape'
         self.specific = wrapper.specific
+
+    def get_or_make_vault(self):
+        # load the vault file. if not existing, make one.
+        if os.path.isfile(self.vaultpath):
+            vault = pd.read_csv(self.vaultpath)
+            logger.info(f'found {len(vault)} pre-existing {self.domain} entries')
+        else:
+            vault = pd.DataFrame()
+        return vault
+
+    def results_to_vault(self):
+        pass
 
     def scrape(self):
         # coordinate scraping of a specific website
         self.results = {}
         if self.domain == 'ronorp':
-            # self.scrape_ronorp()
+            self.scrape_ronorp()
             pass
         elif self.domain == 'wgzimmer':
             self.scrape_wgzimmer()
@@ -84,15 +89,12 @@ class Scraper(Scrapewrapper):
         else:
             print(f'There is no scrape_{self.domain}() implemented yet.')
 
-        results_df = pd.DataFrame(self.results).transpose()
-        results_df['href'] = results_df.index
-        results_df = results_df.reset_index(drop=True)
-        self.df = results_df
 
     def scrape_ronorp(self):
         # the scraper specific for ronorp.net
+        id_col = 'title' # the column to identify existing entries
         logger.info(f'starting scraping {self.domain}')
-        results = {}
+        results_df = []
         url_next = self.start_url
 
         # go through all indexpages
@@ -136,6 +138,8 @@ class Scraper(Scrapewrapper):
             for j, element in enumerate(elements):
                 # if j > 1:  # debug
                 #     break
+                # if len(results_df)>1: # debug
+                #     break
                 try:
                     link = element.a['href']
                 except KeyError:
@@ -144,13 +148,16 @@ class Scraper(Scrapewrapper):
 
                 # 'alt' was the characteristic element name that contained the link & values
                 if 'alt' in element.a.attrs:
-                    if 'alt' in self.vault.columns:
-                        if element.a['alt'] in self.vault['alt'].values:
+                    if 'title' in self.vault.columns:
+                        if element.a['alt'] in self.vault['title'].values:
                             logger.info(f'already scraped: {link}')
                             n_known += 1
                             continue
-                    self.results.update({link: element.a.attrs})
-                    self.scrape_individual_adpage(link)
+
+                    last = u.wait_minimum(abs(random.gauss(1, 1)) + 3, last)
+                    single_result = self.scrape_individual_adpage(link)
+                    single_result['title'] = element.a.attrs['alt']
+                    results_df.append(single_result)
                     n_scrapes += 1
                 else:
                     logger.info(f'ad: {link}')
@@ -159,7 +166,7 @@ class Scraper(Scrapewrapper):
                 logger.info('no new ads on this indexpage. not proceeding to next indexpage')
                 url_next = None
 
-        self.driver.quit()
+        self.result = results_df
 
     def scrape_individual_adpage(self, url):
         # the scraper for an individual ad, given its url
@@ -178,10 +185,15 @@ class Scraper(Scrapewrapper):
             fpath = None
         else:
             fpath = self.save_content(content.text, 'adpage', ts=now)
-        self.results[url].update({'domain': self.domain,
-                                  'fname': fpath,
-                                  'scrape_ts': now.replace(microsecond=0),
-                                  })
+        result = pd.DataFrame(index = [0],
+                              data = {'href':url,
+                                      'domain': self.domain,
+                                      'fname': fpath,
+                                      'scrape_ts': now.replace(microsecond=0),
+                              })
+        # todo: add failure case
+        return result
+
 
     def save_content(self, content, prefix, ts=None):
         if not ts:
@@ -198,8 +210,9 @@ class Scraper(Scrapewrapper):
         logger.info('scraping wgzimmer.ch')
         base_sleeptime = 0.5
         regions = self.specific['wgzimmer']['regions']
-        result_dfs = [] # todo: do we use this list?
+        results_df = []
         for region in regions:
+            logger.info(f'wgzimmer {region} scraping...')
             # go to landing page
             self.driver.get(self.start_url)
             time.sleep(base_sleeptime)
@@ -233,7 +246,7 @@ class Scraper(Scrapewrapper):
                 n_known = 0
                 last = 0
                 for i, entry in enumerate(list_entries):
-                    last = u.wait_minimum(abs(random.gauss(1, 1)) + 3, last)
+
                     hrefobj = entry.find(
                         lambda tag: (tag.name == "a") and
                                     ({'href'} == set(tag.attrs.keys())))
@@ -247,18 +260,22 @@ class Scraper(Scrapewrapper):
                     # update single-page-result
                     timestampstr = hrefobj.find('span', attrs={'class': 'create-date left-image-result'}).text
                     timestamp = dateparser.parse(u.html_clean_1(timestampstr), date_formats=['%d/%m/%Y'])
+                    if not timestamp:
+                        pass
+                    last = u.wait_minimum(abs(random.gauss(1, 1)) + 3, last)
+                    single_result = self.scrape_individual_adpage(link)
 
-                    self.results.update({link: {'timestamp': timestamp}
-                                         })
-                    self.scrape_individual_adpage(link)
+                    single_result['timestamp'] = timestamp
+                    results_df.append(single_result)
                     n_scrapes += 1
 
                 if n_elements == n_known:
                     logger.info('no new ads on this indexpage. not proceeding to next indexpage')
-                    url_next = None
+                    next_page =[]
+                else:
 
-                # check for next indexpage
-                next_page = self.driver.find_elements_by_id("gtagSearchresultNextPage")
+                    # check for next indexpage
+                    next_page = self.driver.find_elements_by_id("gtagSearchresultNextPage")
 
                 if  (len(next_page) > 0):
                     next_page[0].click()
@@ -269,10 +286,8 @@ class Scraper(Scrapewrapper):
                     html_from_page = None
                     logger.info('no more button to next indexpage. prabaly last page')
 
-        self.driver.quit()
+        self.result = results_df # list of 1-row-dfs
 
-    def scrapw_wgzimmer(self):
-        pass
 
     def save_to_csv(self, index=False):
         df_file = self.datapath / 'scraper_df.csv'
