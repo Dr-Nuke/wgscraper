@@ -8,6 +8,8 @@ from loguru import logger
 class Analysis:
     # a simple class to host the analysis & search
     def __init__(self, config):
+        self.urls = config['urls']
+        self.specific = config['specific_configs']
         self.root = config['root']
         # inputfile
         # outputfile (for keeping track)

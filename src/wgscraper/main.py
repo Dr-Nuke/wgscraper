@@ -30,6 +30,7 @@ if __name__ == '__main__':
 
 print('end')
 
+# todo sort out encoding. should always be utf-8
 # todo: clean duplicated results from scraping (incl. previous entries) , 'last'
 # todo: make an archive to dump old entries of any table
 # todo: reduce ronorp scraping junk appearing in the df

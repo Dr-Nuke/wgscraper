@@ -83,7 +83,7 @@ class Processor:
 
         # process the pending data for the ronorp domain
         if len(df) == 0:
-            logger.info('no entries for ronorp to process')
+            logger.info(f'no entries for {self.domain} to process')
             return []
         regex = {r'category1': r'Biete \/ Suche \/ Tausche: (.+?):',
                  r'bid_ask': r'Biete \/ Suche \/ Tausche: .+?: (.+?) ',
@@ -133,7 +133,6 @@ class Processor:
             logger.info('no entries were processed')
 
         return self
-
 
     def process_wgzimmer(self):
         # run processing jobs
@@ -155,24 +154,17 @@ class Processor:
         fails = []
         processed = []
 
-        # process the pending data for the ronorp domain
+        # process the pending data for the wgzimmer domain
         if len(df) == 0:
-            logger.info('no entries for ronorp to process')
+            logger.info(f'no entries for {self.domain} to process')
             return []
-        regex = {r'category1': r'Biete \/ Suche \/ Tausche: (.+?):',
-                 r'bid_ask': r'Biete \/ Suche \/ Tausche: .+?: (.+?) ',
-                 r'rent_buy': r'Mieten \& Kaufen: (.+?) ',
-                 r'rooms': r'Zimmer: ([^a-zA-Z ]+)',
-                 r'rent': r'Kosten: ([^a-zA-Z ]+)',
-                 r'address': r'Adresse: (.*?)Kontakt',
-                 r'duration': r'Vertragsart: (.*?) ',
-                 }
+
         dfs = []
         n_iter = len(df)
         l = u.Looplogger(n_iter, f'processing {n_iter} entries')
         for i, row in df.iterrows():
             # if i > 10:
-            #     break # debug
+            #     break  # debug
             l.log(i)
             try:
                 with open(row['fname'], 'r', encoding='utf-8') as f_in:
@@ -180,21 +172,65 @@ class Processor:
             except:
                 logger.info(f"could not ingest {row['fname']}")
 
-            details = u.html_clean_1(soup.find('div', attrs={'class': 'detail_block'}).get_text())
-            details = details.split('Die vollen', 1)[0]
+            extracted_details = {}
+            ad_page_body = soup.find('div', attrs={'class': 'text result nbt'})
+            block1 = ad_page_body.find('div', attrs={'wrap col-wrap date-cost'})
+            block1_items = block1.find_all('p')
 
-            extracted_details = extract_regex_details(details, regex)
-            extracted_details['details'] = details
-            extracted_details['text'] = soup.find('p', attrs={'class': 'text_comment'}).get_text()
-            extracted_details['timestamp'] = dateparser.parse(
-                soup.find_all('div', attrs={'class': 'pull-left'})[0].get_text())
-            extracted_details['title'] = row['title']
+            # get block 1 items: start, end, rent
+            for item in block1_items:
+                itemstring = item.text.strip()
+                if itemstring.startswith('Ab dem'):
+                    fromstring = itemstring.replace('Ab dem', '').strip()
+                    startdate = dateparser.parse(fromstring, date_formats=['%d/%m/%Y'])
+                    extracted_details['from'] = startdate.date()
+
+                if itemstring.startswith('Bis'):
+                    if 'unbefristet' in itemstring.lower():
+                        duration = 'unbefristet'
+                    else:
+                        duration = 'befristet'
+                    extracted_details['duration'] = duration
+
+                if itemstring.startswith('Miete / Monat'):
+                    coststring = itemstring.replace('Miete / Monat sFr.', '').strip()
+                    coststring = coststring.replace('.–', '').strip()
+                    extracted_details['rent'] = coststring
+
+            # get block2 items: address
+            block2 = ad_page_body.find('div', attrs={'class': 'wrap col-wrap adress-region'})
+            block2_items = block2.find_all('p')
+            for item in block2_items:
+                itemstring = item.text.strip()
+                if ' Adresse ' in item.text:
+                    extracted_details['Street'] = itemstring.replace('Adresse', '').strip()
+                elif ' Ort ' in item.text:
+                    extracted_details['zip'] = itemstring.replace('Ort', '').strip()
+
+            extracted_details['address'] = extracted_details['Street'] + ' ' + extracted_details['zip']
+
+            # block3: "the room is..."
+            block3 = ad_page_body.find('div', attrs={'class': 'wrap col-wrap mate-content nbb'})
+            block3_items = block3.find_all('p')
+            extracted_details['room_is'] = u.html_clean_1(block3_items[0].text)
+
+            # block 4: "Wir suchen..."
+            block4 = ad_page_body.find('div', attrs={'class': 'wrap col-wrap room-content'})
+            block4_items = block4.find_all('p')
+            extracted_details['we_want'] = u.html_clean_1(block4_items[0].text)
+
+            # block3 5: "we are..."
+            block5 = ad_page_body.find('div', attrs={'class': 'wrap col-wrap person-content'})
+            block5_items = block5.find_all('p')
+            extracted_details['we_are'] = u.html_clean_1(block5_items[0].text)
+
+            extracted_details['text'] = ''.join([extracted_details[key] for key in ['room_is', 'we_want', 'we_are' ]])
+
+            # get remaining properties that we already know
             extracted_details['url'] = row['href']
             extracted_details['domain'] = row['domain']
             extracted_details['scrape_ts'] = row['scrape_ts']
-            timestampstr = soup.find_all('div', attrs={'class': 'pull-left'})[0].text
-            extracted_details['timestamp'] = dateparser.parse(u.html_clean_1(timestampstr),
-                                                              date_formats=['%d.%m.%Y %h:%M'])
+            extracted_details['timestamp'] = row['timestamp']
 
             dfs.append(pd.DataFrame(index=[i], data=extracted_details))
 
@@ -202,11 +238,12 @@ class Processor:
             self.result = pd.concat(dfs)
             self.df_out = pd.concat([self.df_out, self.result])
             self.df_out.to_csv(self.output_vault_path, index=False)
-            logger.info(f'processed {len(self.result)} enries from ronorp')
+            logger.info(f'processed {len(self.result)} enries from {self.domain} saved to {self.output_vault_path}')
         else:
             logger.info('no entries were processed')
 
         return self
+
 
 def extract_regex_details(text, regex):
     # extract a specific set of ronorp
