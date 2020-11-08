@@ -34,11 +34,11 @@ class Scrapewrapper:
             scr = Scraper(self, url)
             scr.scrape()
 
-            if len(scr.results) > 0:
-                scr.results_df = pd.concat(scr.results)
+            if len(scr.result) > 0:
+                scr.results_df = pd.concat(scr.result)
                 scr.vault = pd.concat([scr.vault, scr.results_df])
                 scr.vault.to_csv(scr.vaultpath, index=False)
-            logger.info(f'scraped {len(scr.results)} new ads from {scr.domain}')
+            logger.info(f'scraped {len(scr.result)} new ads from {scr.domain}, saved in {scr.vaultpath}')
 
         self.driver.quit()
         logger.info('scraping completed')
@@ -61,27 +61,24 @@ class Scraper(Scrapewrapper):
         self.driver = wrapper.driver
         self.vaultpath = wrapper.vaultpath.parent / (f'{wrapper.vaultpath.name}_{self.domain}.csv')
         self.vault = self.get_or_make_vault()
-        self.indexfile = self.savedir / 'indexfile.scrape'
+        self.indexfile = self.savedir / 'indexfile.scrape' # todo: remove indexfile
         self.specific = wrapper.specific
+        self.result = []
 
     def get_or_make_vault(self):
         # load the vault file. if not existing, make one.
         if os.path.isfile(self.vaultpath):
             vault = pd.read_csv(self.vaultpath)
-            logger.info(f'found {len(vault)} pre-existing {self.domain} entries')
+            logger.info(f'found {len(vault)} pre-existing {self.domain} entries in {self.vaultpath}')
         else:
             vault = pd.DataFrame()
         return vault
 
-    def results_to_vault(self):
-        pass
-
     def scrape(self):
         # coordinate scraping of a specific website
-        self.results = {}
         if self.domain == 'ronorp':
             self.scrape_ronorp()
-            pass
+
         elif self.domain == 'wgzimmer':
             self.scrape_wgzimmer()
         # elif self.domain in [implemented]:
@@ -136,9 +133,9 @@ class Scraper(Scrapewrapper):
             n_scrapes = 0
             n_known = 0
             for j, element in enumerate(elements):
-                # if j > 1:  # debug
+                # if j > 4:  # debug
                 #     break
-                # if len(results_df)>1: # debug
+                # if len(results_df)>2: # debug
                 #     break
                 try:
                     link = element.a['href']
@@ -232,7 +229,7 @@ class Scraper(Scrapewrapper):
             html_from_page = self.driver.page_source
 
             # go through all indexpages
-            max_indexpages = 10
+            max_indexpages = 1
             for i in range(max_indexpages):
                 if not html_from_page:
                     break
@@ -287,11 +284,6 @@ class Scraper(Scrapewrapper):
                     logger.info('no more button to next indexpage. prabaly last page')
 
         self.result = results_df # list of 1-row-dfs
-
-
-    def save_to_csv(self, index=False):
-        df_file = self.datapath / 'scraper_df.csv'
-        pd.DataFrame(self.results).transpose().to_csv(df_file, index=False)
 
 
 def time_since_modified(fname):
