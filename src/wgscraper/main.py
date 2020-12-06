@@ -23,7 +23,7 @@ if __name__ == '__main__':
     logger.add(lofgilepath / "logfile{time}.log")
     logger.info('starting main scraping')
 
-    # s = scrape.main(config)
+    s = scrape.main(config)
     t = process.main(config)
     # p = postp.main(config)
     # a = analysis.main(config)

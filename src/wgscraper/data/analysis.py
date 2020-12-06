@@ -11,9 +11,7 @@ class Analysis:
         self.urls = config['urls']
         self.specific = config['specific_configs']
         self.root = config['root']
-        # inputfile
-        # outputfile (for keeping track)
-        # resultsfile
+
         # separate results
         self.datapath = config['datapath']
         self.input_path = self.datapath / config['post_processed']
