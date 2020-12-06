@@ -53,16 +53,16 @@ class Scraper(Scrapewrapper):
         self.start_url = url
         self.base_url = urlparse(url).netloc
         self.domain = u.url_to_domain(self.start_url)
-        self.savedir = wrapper.datapath / self.domain
+        self.savedir = wrapper.gl___datapath / self.domain
         if not os.path.isdir(self.savedir):
             os.makedirs(self.savedir)
 
-        self.driverpath = wrapper.driverpath
-        self.driver = wrapper.driver
+        self.driverpath = wrapper.sc___driverpath
+        self.driver = wrapper.sc___driver
         self.vaultpath = wrapper.vaultpath.parent / (f'{wrapper.vaultpath.name}_{self.domain}.csv')
         self.vault = self.get_or_make_vault()
         self.indexfile = self.savedir / 'indexfile.scrape' # todo: remove indexfile
-        self.specific = wrapper.specific
+        self.specific = wrapper.sc___specific
         self.result = []
 
     def get_or_make_vault(self):
