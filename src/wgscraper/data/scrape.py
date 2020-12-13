@@ -61,7 +61,7 @@ class Scraper(Scrapewrapper):
         self.driver = wrapper.sc___driver
         self.vaultpath = wrapper.vaultpath.parent / (f'{wrapper.vaultpath.name}_{self.domain}.csv')
         self.vault = self.get_or_make_vault()
-        self.indexfile = self.savedir / 'indexfile.scrape' # todo: remove indexfile
+        self.indexfile = self.savedir / 'indexfile.scrape'  # todo: remove indexfile
         self.specific = wrapper.sc___specific
         self.result = []
 
@@ -83,13 +83,10 @@ class Scraper(Scrapewrapper):
             self.scrape_wgzimmer()
         # elif self.domain in [implemented]:
         #     do stuff
-        else:
-            print(f'There is no scrape_{self.domain}() implemented yet.')
-
 
     def scrape_ronorp(self):
         # the scraper specific for ronorp.net
-        id_col = 'title' # the column to identify existing entries
+        id_col = 'title'  # the column to identify existing entries
         logger.info(f'starting scraping {self.domain}')
         results_df = []
         url_next = self.start_url
@@ -182,15 +179,14 @@ class Scraper(Scrapewrapper):
             fpath = None
         else:
             fpath = self.save_content(content.text, 'adpage', ts=now)
-        result = pd.DataFrame(index = [0],
-                              data = {'href':url,
-                                      'domain': self.domain,
-                                      'fname': fpath,
-                                      'scrape_ts': now.replace(microsecond=0),
-                              })
+        result = pd.DataFrame(index=[0],
+                              data={'href': url,
+                                    'domain': self.domain,
+                                    'fname': fpath,
+                                    'scrape_ts': now.replace(microsecond=0),
+                                    })
         # todo: add failure case
         return result
-
 
     def save_content(self, content, prefix, ts=None):
         if not ts:
@@ -268,13 +264,13 @@ class Scraper(Scrapewrapper):
 
                 if n_elements == n_known:
                     logger.info('no new ads on this indexpage. not proceeding to next indexpage')
-                    next_page =[]
+                    next_page = []
                 else:
 
                     # check for next indexpage
                     next_page = self.driver.find_elements_by_id("gtagSearchresultNextPage")
 
-                if  (len(next_page) > 0):
+                if (len(next_page) > 0):
                     next_page[0].click()
                     html_from_page = self.driver.page_source
                     logger.info('going to next indexpage')
@@ -283,7 +279,7 @@ class Scraper(Scrapewrapper):
                     html_from_page = None
                     logger.info('no more button to next indexpage. prabaly last page')
 
-        self.result = results_df # list of 1-row-dfs
+        self.result = results_df  # list of 1-row-dfs
 
 
 def time_since_modified(fname):

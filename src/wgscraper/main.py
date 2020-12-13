@@ -10,12 +10,11 @@ configpath = Path(r'C:\coding\wgscraper\configs\config.py').parent
 sys.path.append(str(configpath))
 from config import config
 
-
+import src.wgscraper.data.wrapper as W
 import src.wgscraper.data.analysis as analysis
 import src.wgscraper.data.postprocess as postp
 import src.wgscraper.data.process as process
 import src.wgscraper.data.scrape as scrape
-# from configs.config import base_urls, driverpath, searchdict
 
 
 if __name__ == '__main__':
@@ -23,10 +22,9 @@ if __name__ == '__main__':
     logger.add(lofgilepath / "logfile{time}.log")
     logger.info('starting main scraping')
 
-    s = scrape.main(config)
-    t = process.main(config)
-    # p = postp.main(config)
-    # a = analysis.main(config)
+    s = W.Scrape(config)
+    # s.scrape()
+    s.process()
 
 print('end')
 

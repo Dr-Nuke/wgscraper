@@ -1,6 +1,9 @@
 import re
 import time
 from urllib.parse import urlparse
+from pathlib import Path
+import os
+import pandas as pd
 
 from loguru import logger
 
@@ -15,11 +18,8 @@ class Container:
 
 def url_to_domain(url):
     # a function to turn a string url into the bare domain string
-    domain = urlparse(url).netloc  # results in www.abc.xy
-    domain = domain.replace('www.', '')
-    pos = domain.rfind('.')  # find rightmost dot
-    if pos >= 0:  # found one
-        domain = domain[:pos]
+    # take url, splib by dot, and take second rightmost constituent
+    domain = urlparse(url).netloc.split('.')[-2]
     return domain
 
 
@@ -61,7 +61,7 @@ class Looplogger:
         logger.info(message)
 
     def log(self, i):
-        #         print(i,self.counter,self.state,self.counter/self.n < self.state/100,(self.counter+1)/self.n >= self.state/100)
+        #  print(i,self.counter,self.state,self.counter/self.n < self.state/100,(self.counter+1)/self.n >= self.state/100)
         if (self.counter / self.n < self.state / 100) and ((self.counter + 1) / self.n >= self.state / 100):
             print(f'{self.state}% ', end='')
             self.state += 10
@@ -74,3 +74,16 @@ def safe_drop(df, dropcandidates):
     dropcols = [col for col in dropcandidates if col in actualcols]
 
     return df.drop(columns=dropcols)
+
+
+def lib_path_maker(folder=Path(''),name='',dom=''):
+    path = folder / ('_'.join([name,dom]) + '.csv')
+    return path
+
+
+def load_df_safely(path):
+    if os.path.isfile(path):
+        lib = pd.read_csv(path)
+    else:
+        lib = pd.DataFrame()
+    return lib
