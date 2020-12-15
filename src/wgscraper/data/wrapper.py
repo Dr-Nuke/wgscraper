@@ -2,7 +2,10 @@ import datetime
 import os
 import random
 import re
+import smtplib
 import time
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 from urllib.parse import urlparse
 
 import dateparser
@@ -28,7 +31,7 @@ class Scrape:
         self.d['gl']['root'] = config['global']['root']
         self.d['gl']['urls'] = config['global']['urls']
         self.d['gl']['domains'] = [u.url_to_domain(url) for url in self.d['gl']['urls']]
-        self.d['gl']['domains'] = ['ronorp', 'wgzimmer'] # debug
+        self.d['gl']['domains'] = ['ronorp', 'wgzimmer']  # debug
         self.d['gl']['datapath'] = config['global']['datapath']
         self.d['gl']['current_stage'] = ''
         self.d['gl']['current_dom'] = ''
@@ -36,6 +39,7 @@ class Scrape:
         self.d['gl']['stages'] = {key: {} for key in config.keys() if key != 'global'}
         self.d['gl']['force_reprocessing'] = config['global']['force_reprocessing']
         self.d['gl']['forced_cutoff'] = config['global']['forced_cutoff']
+        self.d['gl']['active_domains'] = config['global']['active_domains']
 
         # attributes for scraping
         self.d['sc'] = {}
@@ -50,28 +54,37 @@ class Scrape:
         self.d['pr']['name'] = config['process']['stage_name']
         self.d['pr']['lib_out'] = config['process']['lib_out']
 
+        self.d['un'] = {}
+        self.d['un']['name'] = config['unify']['stage_name']
+        self.d['un']['lib_out'] = config['unify']['lib_out']
+        self.d['un']['lib_out_path'] = u.lib_path_maker(folder=self.d['gl']['datapath'],
+                                                        name=self.d['un']['lib_out'])
+
+        self.d['an'] = {}
+        self.d['an']['name'] = config['analyze']['stage_name']
+        self.d['an']['lib_out'] = config['analyze']['lib_out']
+        self.d['an']['results_archive_path'] = u.lib_path_maker(folder=self.d['gl']['datapath'],
+                                                                name=config['analyze']['results_archive_path'])
+        self.d['an']['lib_in_path'] = self.d['un']['lib_out_path']
+        self.d['an']['lib_out_path'] = u.lib_path_maker(folder=self.d['gl']['datapath'],
+                                                        name=self.d['an']['lib_out'])
+        self.d['an']['searchdict'] = config['analyze']['searchdict']
+        self.d['an']['email'] = config['analyze']['email']
+
         # generate out_file_paths
-        for stage in ['sc', 'pr']:
-            for dom in ['ronorp','wgzimmer']:
+        for stage in ['sc', 'pr', 'un']:
+            for dom in self.d['gl']['domains']:
                 self.d[stage][dom] = {}
                 self.d[stage][dom]['lib_out_path'] = u.lib_path_maker(folder=self.d['gl']['datapath'],
                                                                       name=self.d[stage]['lib_out'],
                                                                       dom=dom)
         # generate in_file_paths
-        for stage in ['pr']:
-            for dom in ['ronorp','wgzimmer']:
-                self.d[stage][dom]['lib_in_path'] = self.d['sc'][dom]['lib_out_path']
+        prev = ['sc', 'pr', 'un']
+        for i, stage in enumerate(['pr', 'un']):
+            for dom in self.d['gl']['domains']:
+                self.d[stage][dom]['lib_in_path'] = self.d[prev[i]][dom]['lib_out_path']
 
-        print('')
-
-    def get_or_make_lib(self, stage, dom=None):
-        # load the lib file. if not existing, make one.
-        if os.path.isfile(self.vaultpath):
-            vault = pd.read_csv(self.vaultpath)
-            logger.info(f'found {len(vault)} pre-existing {self.domain} entries in {self.vaultpath}')
-        else:
-            vault = pd.DataFrame()
-        return vault
+        print('')  # debug # todo: remove line
 
     def scrape(self):
         # go through all domains and execute according scraper, if available
@@ -209,6 +222,9 @@ class Scrape:
                                     'fname': fpath,
                                     'scrape_ts': now.replace(microsecond=0),
                                     })
+        # todo: add a hash for later hashing
+        # result['hash'] = result.apply(lambda x: hash(tuple(x)), axis = 1)
+
         # todo: add failure case
         return result
 
@@ -310,7 +326,7 @@ class Scrape:
                 else:
                     # or abort
                     html_from_page = None
-                    logger.info('no more button to next indexpage. prabaly last page')
+                    logger.info('no more button to next indexpage. probaly last page or no new ads on this one')
 
         if len(results_df) > 0:
             results_df = pd.concat(results_df)
@@ -357,7 +373,7 @@ class Scrape:
                     f'attempting to process {n_attempt} of {n} entries, ignoring {ignored} previously processed existing entries')
             else:
                 # or take what came after the cutoff
-                df = self.lib_in[self.lib_in['scrape_ts'] > self.d['gl']['forced_cutoff']]
+                df = lib_in[self.lib_in['scrape_ts'] > self.d['gl']['forced_cutoff']]
                 logger.info(f'processing all {dom} entries')
             self.d[stage][dom]['df_attempt'] = df
 
@@ -522,6 +538,150 @@ class Scrape:
 
         return dfs
 
+    def unify(self):
+        # unifies all the per-domain results into a single archive
+        stage = 'un'
+        self.d['gl']['current_stage'] = self.d[stage]['name']
+
+        lib_ins = []
+
+        for i, dom in enumerate(self.d['gl']['domains']):
+            self.d['gl']['current_dom'] = dom
+
+            # first, let's get all the new stuff
+            lib_in = u.load_df_safely(self.d[stage][dom]['lib_in_path'])
+            lib_ins.append(lib_in)
+
+        lib_out = pd.concat(lib_ins).reset_index(drop=True)
+
+        lib_out.to_csv(self.d[stage]['lib_out_path'], index=False)
+        logger.info(f'unified {len(lib_out)} ads ')
+        logger.info('unifying completed')
+
+    def analyze(self):
+
+        # analyze the ads & make results
+        stage = 'an'
+        self.d['gl']['current_stage'] = self.d[stage]['name']
+
+        # first, let's get all the new stuff
+        lib_in = u.load_df_safely(self.d[stage]['lib_in_path'])
+        self.d[stage]['lib_in'] = lib_in
+
+        lib_out = u.load_df_safely(self.d[stage]['lib_out_path'])
+        self.d[stage]['lib_out'] = lib_out
+
+        former_results = u.load_df_safely(self.d[stage]['results_archive_path'])
+        self.d[stage]['former_results'] = former_results
+
+        logger.info(f'found {len(lib_in)} existing entries in {self.d[stage]["lib_in_path"]}')
+        logger.info(f'found {len(lib_out)} existing entries in {self.d[stage]["lib_out_path"]}')
+
+        if len(lib_out) > 0:
+            if not self.d['gl']['force_reprocessing']:
+                # Either Identify what is new in the input
+                key_diff = set(lib_in['url']).difference(lib_out['url'])
+                df = lib_in[lib_in['url'].isin(key_diff)]
+                n = len(lib_in)
+                n_attempt = len(key_diff)
+                ignored = len(lib_in) - n_attempt
+                logger.info(
+                    f'attempting to analyze {n_attempt} of {n} entries, ignoring {ignored} previously processed existing entries')
+            else:
+                # or take what came after the cutoff
+                df = lib_in[self.lib_in['scrape_ts'] > self.d['gl']['forced_cutoff']]
+                logger.info(f'analyzing all entries')
+        else:
+            df = lib_in
+        self.d[stage]['df_attempt'] = df
+
+        # make a copy for later
+        df_bak = df
+
+        # process the pending data for the ronorp domain
+        if len(df) == 0:
+            logger.info(f'no entries for to analyze')
+            return
+
+        df = df[df['duration'] != 'befristet']
+        df = df[df['bid_ask'] != 'Suche']
+
+        keepcols = ['rent', 'address', 'scrape_ts', 'timestamp',
+                    'rooms', 'details', 'title', 'url', 'text', 'domain']
+        df = df[keepcols]
+        df = df.fillna('')
+
+        results = []
+        for search in self.d['an']['searchdict']:
+            col = search['column']
+            pat = search['pattern']
+            if search['flag'] == 'IGNORECASE':
+                result = df[df[col].str.contains(pat, flags=re.IGNORECASE, regex=True)]
+            else:
+                result = df[df[col].str.contains(pat, regex=True)]
+
+            if len(result) > 0:
+                pd.options.mode.chained_assignment = None
+                result['searchterm'] = pat
+                result['searchfield'] = col
+                pd.options.mode.chained_assignment = 'warn'
+            results.append(result)
+
+        result = pd.concat(results).drop_duplicates(subset=['title'])
+
+        # write results
+        if len(result) > 0:
+            all_results = pd.concat([former_results, result])
+            self.d[stage]['results_df'] = all_results
+            all_results.to_csv(self.d['an']['results_archive_path'], index=False)
+
+            # make email
+            result = result[['rent', 'url', 'address', 'rooms', 'title', 'searchterm', 'searchfield', 'scrape_ts']]
+            result_formatted = result.sort_values(by='scrape_ts', ascending=False).style.format({'url': make_clickable})
+
+            if len(former_results) > 0:
+                old_results = former_results[
+                    ['rent', 'url', 'address', 'rooms', 'title', 'searchterm', 'searchfield', 'scrape_ts']]
+                old_results = old_results.sort_values(by='scrape_ts', ascending=False).style.format(
+                    {'url': make_clickable})
+            else:
+                old_results = pd.DataFrame().style.format({'url': make_clickable})
+
+            fromaddr = "Mayerhansmichael@gmail.com"
+            toaddr = "chris@boles.ch"
+            msg = MIMEMultipart()
+            msg['From'] = self.d['an']['email']['fromaddr']
+            msg['To'] = self.d['an']['email']['toaddr']
+            msg['Subject'] = self.d['an']['email']['subject']
+
+            intro = self.d['an']['email']['intro']
+
+            body = result_formatted.hide_index().render()
+            second_table  = old_results.hide_index().render()
+
+            msg.attach(MIMEText(intro, 'text'))
+            msg.attach(MIMEText(body, 'html'))
+            msg.attach(MIMEText(second_table, 'html'))
+
+            server = smtplib.SMTP(self.d['an']['email']['smtp_host'],
+                                  self.d['an']['email']['smtp_port'])
+            server.ehlo()
+            server.starttls()
+            server.ehlo()
+            server.login(self.d['an']['email']['fromaddr'],
+                         self.d['an']['email']['pwd'])
+            text = msg.as_string()
+            server.sendmail(fromaddr, toaddr, text)
+
+        else:
+            logger.info(f'no results from analyzing')
+        lib_out = pd.concat([lib_out, df_bak])
+        lib_out.to_csv(self.d[stage]['lib_out_path'], index=False)
+        logger.info(
+            f'analyzed {len(df_bak)} new ads from, found {len(result)} results. saved in {self.d[stage]["lib_out_path"]}')
+
+    logger.info('processing completed')
+
 
 def extract_regex_details(text, regex):
     # extract a specific set of ronorp
@@ -537,6 +697,11 @@ def extract_regex_details(text, regex):
             prop = 'unknown'
         d[k] = prop
     return d
+
+
+def make_clickable(val):
+    # allows to cast a pandas url column into a clickable link
+    return '<a target="_blank" href="{}">{}</a>'.format(val, 'link')
 
 
 class container:

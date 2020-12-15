@@ -11,10 +11,6 @@ sys.path.append(str(configpath))
 from config import config
 
 import src.wgscraper.data.wrapper as W
-import src.wgscraper.data.analysis as analysis
-import src.wgscraper.data.postprocess as postp
-import src.wgscraper.data.process as process
-import src.wgscraper.data.scrape as scrape
 
 
 if __name__ == '__main__':
@@ -23,8 +19,10 @@ if __name__ == '__main__':
     logger.info('starting main scraping')
 
     s = W.Scrape(config)
-    # s.scrape()
+    s.scrape()
     s.process()
+    s.unify()
+    s.analyze()
 
 print('end')
 
