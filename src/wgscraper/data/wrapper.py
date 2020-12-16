@@ -559,7 +559,7 @@ class Scrape:
         logger.info('unifying completed')
 
     def analyze(self):
-
+        # todo: move email part into sparate member function
         # analyze the ads & make results
         stage = 'an'
         self.d['gl']['current_stage'] = self.d[stage]['name']

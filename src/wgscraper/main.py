@@ -24,6 +24,7 @@ if __name__ == '__main__':
     s.unify()
     s.analyze()
 
+
 print('end')
 
 # todo sort out encoding. should always be utf-8
