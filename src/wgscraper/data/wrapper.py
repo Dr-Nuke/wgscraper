@@ -16,6 +16,7 @@ from bs4 import BeautifulSoup
 from loguru import logger
 from selenium import webdriver
 from selenium.webdriver.support.ui import Select
+from selenium.webdriver.firefox.options import Options
 
 
 # this is the wrapper filefor the scraper project
@@ -31,7 +32,9 @@ class Scrape:
         self.d['gl']['root'] = config['global']['root']
         self.d['gl']['urls'] = config['global']['urls']
         self.d['gl']['domains'] = [u.url_to_domain(url) for url in self.d['gl']['urls']]
-        self.d['gl']['domains'] = ['ronorp', 'wgzimmer']  # debug
+        # self.d['gl']['domains'] = [
+        #                             # 'ronorp',
+        #                            'wgzimmer']  # debug
         self.d['gl']['datapath'] = config['global']['datapath']
         self.d['gl']['current_stage'] = ''
         self.d['gl']['current_dom'] = ''
@@ -88,7 +91,10 @@ class Scrape:
 
     def scrape(self):
         # go through all domains and execute according scraper, if available
-        self.d['sc']['driver'] = webdriver.Firefox(executable_path=self.d['sc']['driverpath'])
+
+        options = Options()
+        options.headless = True
+        self.d['sc']['driver'] = webdriver.Firefox(options=options, executable_path=self.d['sc']['driverpath'])
         self.d['gl']['current_stage'] = self.d['sc']['name']
         for i, ud in enumerate(zip(self.d['gl']['urls'],
                                    self.d['gl']['domains'])):
@@ -502,11 +508,16 @@ class Scrape:
             # get block2 items: address
             block2 = ad_page_body.find('div', attrs={'class': 'wrap col-wrap adress-region'})
             block2_items = block2.find_all('p')
+
+            # safety: preallocate street & address
+            extracted_details['Street'] = ''
+            extracted_details['zip'] = ''
+
             for item in block2_items:
                 itemstring = item.text.strip()
-                if ' Adresse ' in item.text:
+                if 'Adresse' in itemstring:
                     extracted_details['Street'] = itemstring.replace('Adresse', '').strip()
-                elif ' Ort ' in item.text:
+                elif 'Ort' in itemstring:
                     extracted_details['zip'] = itemstring.replace('Ort', '').strip()
 
             extracted_details['address'] = extracted_details['Street'] + ' ' + extracted_details['zip']
@@ -672,15 +683,16 @@ class Scrape:
                          self.d['an']['email']['pwd'])
             text = msg.as_string()
             server.sendmail(fromaddr, toaddr, text)
+            logger.info('email sent')
 
         else:
-            logger.info(f'no results from analyzing')
+            logger.info(f'no results from analyzing.')
         lib_out = pd.concat([lib_out, df_bak])
         lib_out.to_csv(self.d[stage]['lib_out_path'], index=False)
         logger.info(
             f'analyzed {len(df_bak)} new ads from, found {len(result)} results. saved in {self.d[stage]["lib_out_path"]}')
 
-    logger.info('processing completed')
+    logger.info('analyzing completed')
 
 
 def extract_regex_details(text, regex):

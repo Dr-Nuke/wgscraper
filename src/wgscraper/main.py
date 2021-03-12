@@ -8,8 +8,10 @@ import configparser
 
 configpath = Path(r'C:\coding\wgscraper\configs\config.py').parent
 sys.path.append(str(configpath))
+sys.path.append(str(configpath.parent))
 from config import config
 
+logger.info(f'cwd: {os.getcwd()})
 import src.wgscraper.data.wrapper as W
 
 
