@@ -11,13 +11,15 @@ sys.path.append(str(configpath))
 sys.path.append(str(configpath.parent))
 from config import config
 
-logger.info(f'cwd: {os.getcwd()})
+logger.info(f'cwd: {os.getcwd()}')
 import src.wgscraper.data.wrapper as W
 
 
 if __name__ == '__main__':
     lofgilepath = Path(r'C:\coding\wgscraper\logs')
-    logger.add(lofgilepath / "logfile{time}.log")
+    logger.add(lofgilepath / "logfile{time}.log",
+               colorize=True,
+               format="<green>{time}</green> <level>{message}</level>")
     logger.info('starting main scraping')
 
     s = W.Scrape(config)
