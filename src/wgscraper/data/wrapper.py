@@ -32,9 +32,8 @@ class Scrape:
         self.d['gl']['root'] = config['global']['root']
         self.d['gl']['urls'] = config['global']['urls']
         self.d['gl']['domains'] = [u.url_to_domain(url) for url in self.d['gl']['urls']]
-        # self.d['gl']['domains'] = [
-        #                             # 'ronorp',
-        #                            'wgzimmer']  # debug
+        self.d['gl']['domains'] = [
+                                   'flatfox']  # debug
         self.d['gl']['datapath'] = config['global']['datapath']
         self.d['gl']['current_stage'] = ''
         self.d['gl']['current_dom'] = ''
@@ -87,13 +86,12 @@ class Scrape:
             for dom in self.d['gl']['domains']:
                 self.d[stage][dom]['lib_in_path'] = self.d[prev[i]][dom]['lib_out_path']
 
-        print('')  # debug # todo: remove line
-
     def scrape(self):
         # go through all domains and execute according scraper, if available
 
         options = Options()
         options.headless = True
+        options.headless = False # Todo: remove debug line
         self.d['sc']['driver'] = webdriver.Firefox(options=options, executable_path=self.d['sc']['driverpath'])
         self.d['gl']['current_stage'] = self.d['sc']['name']
         for i, ud in enumerate(zip(self.d['gl']['urls'],
@@ -105,6 +103,10 @@ class Scrape:
 
             elif ud[1] == 'wgzimmer':
                 self.scrape_wgzimmer()
+
+            elif ud[1] == 'flatfox':
+                self.scrape_flatfox()
+
 
             else:
                 print(f'There is no scraper for {ud[1]} implemented yet.')
@@ -343,6 +345,101 @@ class Scrape:
         logger.info(
             f'scraped {len(results_df)} new ads from {dom}, saved in {self.d["sc"][dom]["lib_out_path"]}')
 
+    def scrape_flatfox(self):
+        # the scraper specific for flatfox.net
+        dom = self.d["gl"]["current_dom"]
+        url = self.d['gl']['current_url']
+        logger.info(f'starting scraping {dom}')
+
+        # get existing data
+        lib_out_path = self.d['sc'][self.d['gl']['current_dom']]['lib_out_path']
+        lib_out = u.load_df_safely(lib_out_path)
+        logger.info(f'found {len(lib_out)} pre-existing {dom} entries in {lib_out_path}')
+
+        id_col = 'url'  # the column to identify existing entries
+        results_df = []
+        url_next = self.d['gl']['current_url']
+        base_url = urlparse(url_next).netloc
+
+        # go through all indexpages
+        max_indexpages = 20
+        for i in range(max_indexpages):
+            # start with the first indexpage
+            if not url_next:
+                break
+            # get the head of the indexpage
+            self.d['sc']['driver'].get(url_next)
+            # go through index page, make everything load, and find link to next index page
+            maxiter = 10
+            last = 0
+            for k in range(maxiter):  # scroll down up to maxiter times
+                last = u.wait_minimum(abs(random.gauss(1, 1)) + 3, last)
+                self.d['sc']['driver'].execute_script("window. scrollTo(0,document.body.scrollHeight)")
+                content = self.d['sc']['driver'].page_source  # this is one big string of webpage html
+                soup = BeautifulSoup(content, features="html.parser")
+                goal = soup.find_all('a', attrs={'class': 'pages_links_href pages_arrow'})
+                if goal:
+                    arrows = [element for element in goal if element['title'] == 'Weiter']
+                    if arrows:
+                        logger.info(f'number of arrows: {len(arrows)}')
+                        try:
+                            url_next = 'https://' + base_url + arrows[0]['href']
+                            logger.info(f'found next indexpage: {url_next}')
+                        except:
+                            logger.info('could not extract link for next page')
+                            url_next = None
+
+                        break
+                if k == maxiter - 1:
+                    logger.info(f'indexpage {i} {k}: no next page found')
+                    url_next = None
+
+            # now the indexpage is fully loaded. go through the links of the indexpage
+            elements = soup.find_all(attrs={'class': 'title_comment colored'})
+            n_elements = len(elements)
+            n_scrapes = 0
+            n_known = 0
+            for j, element in enumerate(elements):
+                # if j > 4:  # debug
+                #     break
+                # if len(results_df)>2: # debug
+                #     break
+                try:
+                    link = element.a['href']
+                except KeyError:
+                    logger.info("could not fetch link from element.a['href']")
+                    continue
+
+                # 'alt' was the characteristic element name that contained the link & values
+                if 'alt' in element.a.attrs:
+                    if 'title' in lib_out.columns:
+                        if element.a['alt'] in lib_out['title'].values:
+                            logger.info(f'already scraped: {link}')
+                            n_known += 1
+                            continue
+
+                    last = u.wait_minimum(abs(random.gauss(1, 1)) + 3, last)
+                    single_result = self.scrape_individual_adpage(link)
+                    single_result['title'] = element.a.attrs['alt']
+                    results_df.append(single_result)
+                    n_scrapes += 1
+                else:
+                    logger.info(f'ad: {link}')
+                    n_elements -= 1
+            if n_elements == n_known:
+                logger.info('no new ads on this indexpage. not proceeding to next indexpage')
+                url_next = None
+
+        if len(results_df) > 0:
+            results_df = pd.concat(results_df)
+            self.d['sc'][dom]['results_df'] = results_df
+            lib_out = pd.concat([lib_out, results_df])
+            lib_out.drop_duplicates(subset='href', inplace=True, keep='last')
+            lib_out.to_csv(self.d['sc'][dom]['lib_out_path'], index=False)
+        logger.info(
+            f'scraped {len(results_df)} new ads from {dom}, saved in {self.d["sc"][dom]["lib_out_path"]}')
+
+
     def time_since_modified(fname):
         if os.path.isfile(fname):
             ts = datetime.datetime.fromtimestamp(os.stat(fname).st_mtime)
@@ -393,6 +490,9 @@ class Scrape:
                 results_df = self.process_ronorp()
             elif dom == 'wgzimmer':
                 results_df = self.process_wgzimmer()
+
+            elif dom == 'flatfox':
+                results_df = self.process_flatfox()
             else:
                 print(f'There is no scraper for {dom} implemented yet.')
 
