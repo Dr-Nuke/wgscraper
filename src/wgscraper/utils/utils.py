@@ -87,3 +87,12 @@ def load_df_safely(path):
     else:
         lib = pd.DataFrame()
     return lib
+
+def make_float(x):
+    # a function specific for the flatfox transforms
+    x = x.replace("CHF ", "")
+    x = x.replace("’", "")
+    if x == '':
+        x='0'
+    x=int(x)
+    return x

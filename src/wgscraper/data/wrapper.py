@@ -4,9 +4,11 @@ import random
 import re
 import smtplib
 import time
+import numpy as np
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from urllib.parse import urlparse
+from pathlib import Path
 
 import dateparser
 import pandas as pd
@@ -15,8 +17,11 @@ import utils.utils as u
 from bs4 import BeautifulSoup
 from loguru import logger
 from selenium import webdriver
-from selenium.webdriver.support.ui import Select
 from selenium.webdriver.firefox.options import Options
+from selenium.webdriver.support.ui import Select
+from selenium.webdriver.firefox.firefox_profile import FirefoxProfile
+from selenium.webdriver import DesiredCapabilities
+from selenium.webdriver import Firefox
 
 
 # this is the wrapper filefor the scraper project
@@ -32,8 +37,7 @@ class Scrape:
         self.d['gl']['root'] = config['global']['root']
         self.d['gl']['urls'] = config['global']['urls']
         self.d['gl']['domains'] = [u.url_to_domain(url) for url in self.d['gl']['urls']]
-        self.d['gl']['domains'] = [
-                                   'flatfox']  # debug
+
         self.d['gl']['datapath'] = config['global']['datapath']
         self.d['gl']['current_stage'] = ''
         self.d['gl']['current_dom'] = ''
@@ -90,9 +94,25 @@ class Scrape:
         # go through all domains and execute according scraper, if available
 
         options = Options()
-        options.headless = True
-        options.headless = False # Todo: remove debug line
-        self.d['sc']['driver'] = webdriver.Firefox(options=options, executable_path=self.d['sc']['driverpath'])
+        options.headless = False
+
+        # options.headless = False  # Todo: remove debug line
+        options.add_argument('--window-size=1920,1080')
+        profile = webdriver.FirefoxProfile(
+            str(Path(r'C:\Users\Bo-user\AppData\Local\Mozilla\Firefox\Profiles\ewyg9dd9.Hans')))
+
+        profile.set_preference("dom.webdriver.enabled", False)
+        profile.set_preference('useAutomationExtension', False)
+
+        profile.update_preferences()
+
+        desired = DesiredCapabilities.FIREFOX
+        self.d['sc']['driver'] = webdriver.Firefox(firefox_profile=profile,
+                                                   desired_capabilities=desired,
+                                                   options=options,
+                                                   executable_path=self.d['sc']['driverpath'])
+        self.d['sc']['driver'].execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
+
         self.d['gl']['current_stage'] = self.d['sc']['name']
         for i, ud in enumerate(zip(self.d['gl']['urls'],
                                    self.d['gl']['domains'])):
@@ -209,17 +229,19 @@ class Scrape:
 
     def scrape_individual_adpage(self, url):
         # the scraper for an individual ad, given its url
+        # this is universal for all domains
         logger.info(f'scraping adpage: {url}')
         now = datetime.datetime.now()
         # self.d['sc']['driver'].get(url)
         # content = self.d['sc']['driver'].page_source  # this is one big string of webpage html
         content = requests.get(url)
-        if not content.status_code == 200:
+        if not content.status_code == 200:  # if fist time fails, try again ew times
             for i in range(3):
                 time.sleep(5)
                 content = requests.get(url)
                 if content.status_code == 200:
                     continue
+
             logger.info(f'url returned status code {content.status_code}: {url}')
             fpath = None
         else:
@@ -242,15 +264,16 @@ class Scrape:
 
         fname = prefix + ts.strftime("_%Y-%m-%d_%H-%M-%S_%f") + '.scrape'
         fpath = self.d['gl']['datapath'] / self.d['gl']['current_dom'] / fname
+        # todo: add if not fpath.parent exists, then mkdir
         with open(fpath, mode='w', encoding='UTF-8', errors='strict', buffering=1) as f_out:
             f_out.write(content)
         logger.info(f'saving {fpath}')
         return fpath
 
     def scrape_wgzimmer(self):
-        logger.info('scraping wgzimmer.ch')
         dom = self.d["gl"]["current_dom"]
         url = self.d['gl']['current_url']
+        logger.info(f'starting scraping {dom}')
 
         # get existing data
         lib_out_path = self.d['sc'][dom]['lib_out_path']
@@ -346,89 +369,66 @@ class Scrape:
             f'scraped {len(results_df)} new ads from {dom}, saved in {self.d["sc"][dom]["lib_out_path"]}')
 
     def scrape_flatfox(self):
-        # the scraper specific for flatfox.net
+
         dom = self.d["gl"]["current_dom"]
         url = self.d['gl']['current_url']
         logger.info(f'starting scraping {dom}')
 
+        url = self.make_random_flatfox_url()
+
         # get existing data
-        lib_out_path = self.d['sc'][self.d['gl']['current_dom']]['lib_out_path']
+        lib_out_path = self.d['sc'][dom]['lib_out_path']
         lib_out = u.load_df_safely(lib_out_path)
         logger.info(f'found {len(lib_out)} pre-existing {dom} entries in {lib_out_path}')
 
-        id_col = 'url'  # the column to identify existing entries
         results_df = []
-        url_next = self.d['gl']['current_url']
-        base_url = urlparse(url_next).netloc
+        # get initial page
+        self.d['sc']['driver'].get(url)
+        # go through "mehr anzeigen", i.e. 48 ads per clicked button
+        max_extend_list = 5
+        button_clicks = 0
+        last = 0
 
-        # go through all indexpages
-        max_indexpages = 20
-        for i in range(max_indexpages):
-            # start with the first indexpage
-            if not url_next:
+        # make set of scraped links
+        if 'href' in lib_out.columns:
+            previous_links = set(lib_out['href'])
+        else:
+            previous_links = set()
+        scraped_links = set()
+
+        while button_clicks < max_extend_list:
+            new_links_found = False  # initialize the flag as false
+
+            # click the button
+            button_clicks += 1
+            # last = u.wait_minimum(abs(random.gauss(1, 1)) + 5, last)
+            logger.info(f'moving to {button_clicks} extensions of results page')
+            time.sleep(5) # let the webpage load, otherwise we won't find the buttons
+            buttons = self.d['sc']['driver'].find_elements_by_css_selector('.button.button--primary')
+            logger.info(f'found {len(buttons)} buttons')
+            buttons[1].click()
+            time.sleep(5) # more loading time, otherwise we miss out links
+
+            # find all inks on the page
+            found_links = flatfox_get_links(self.d['sc']['driver'])
+
+            # compare found links with known links (previous + scraped)
+            to_do_links = set(found_links).difference(previous_links.union(scraped_links))
+
+            # if no new links, quit the scraping
+            if len(to_do_links) == 0:
+                logger.info('no new links. aborting')
                 break
-            # get the head of the indexpage
-            self.d['sc']['driver'].get(url_next)
-            # go through index page, make everything load, and find link to next index page
-            maxiter = 10
-            last = 0
-            for k in range(maxiter):  # scroll down up to maxiter times
-                last = u.wait_minimum(abs(random.gauss(1, 1)) + 3, last)
-                self.d['sc']['driver'].execute_script("window. scrollTo(0,document.body.scrollHeight)")
-                content = self.d['sc']['driver'].page_source  # this is one big string of webpage html
-                soup = BeautifulSoup(content, features="html.parser")
-                goal = soup.find_all('a', attrs={'class': 'pages_links_href pages_arrow'})
-                if goal:
-                    arrows = [element for element in goal if element['title'] == 'Weiter']
-                    if arrows:
-                        logger.info(f'number of arrows: {len(arrows)}')
-                        try:
-                            url_next = 'https://' + base_url + arrows[0]['href']
-                            logger.info(f'found next indexpage: {url_next}')
-                        except:
-                            logger.info('could not extract link for next page')
-                            url_next = None
 
-                        break
-                if k == maxiter - 1:
-                    logger.info(f'indexpage {i} {k}: no next page found')
-                    url_next = None
-
-            # now the indexpage is fully loaded. go through the links of the indexpage
-            elements = soup.find_all(attrs={'class': 'title_comment colored'})
-            n_elements = len(elements)
-            n_scrapes = 0
-            n_known = 0
-            for j, element in enumerate(elements):
-                # if j > 4:  # debug
+            # scrape new links
+            for i, link in enumerate(to_do_links):
+                last = u.wait_minimum(abs(random.gauss(1, 1)) + 5, last)
+                single_result = self.scrape_individual_adpage(link)
+                single_result['timestamp'] = None  # havnt found timestamp on the ads yet
+                results_df.append(single_result)
+                # if i > 0:  # debug
                 #     break
-                # if len(results_df)>2: # debug
-                #     break
-                try:
-                    link = element.a['href']
-                except KeyError:
-                    logger.info("could not fetch link from element.a['href']")
-                    continue
-
-                # 'alt' was the characteristic element name that contained the link & values
-                if 'alt' in element.a.attrs:
-                    if 'title' in lib_out.columns:
-                        if element.a['alt'] in lib_out['title'].values:
-                            logger.info(f'already scraped: {link}')
-                            n_known += 1
-                            continue
-
-                    last = u.wait_minimum(abs(random.gauss(1, 1)) + 3, last)
-                    single_result = self.scrape_individual_adpage(link)
-                    single_result['title'] = element.a.attrs['alt']
-                    results_df.append(single_result)
-                    n_scrapes += 1
-                else:
-                    logger.info(f'ad: {link}')
-                    n_elements -= 1
-            if n_elements == n_known:
-                logger.info('no new ads on this indexpage. not proceeding to next indexpage')
-                url_next = None
+            scraped_links.update(to_do_links)
 
         if len(results_df) > 0:
             results_df = pd.concat(results_df)
@@ -438,6 +438,34 @@ class Scrape:
             lib_out.to_csv(self.d['sc'][dom]['lib_out_path'], index=False)
         logger.info(
             f'scraped {len(results_df)} new ads from {dom}, saved in {self.d["sc"][dom]["lib_out_path"]}')
+
+    def make_random_flatfox_url(self):
+        config = {key: val for key, val in self.d['sc']['specific']['flatfox'].items()}
+
+        url_config = config['url_config']
+        url_randomization = config['url_randomization']
+        #     'east': 8.577960,
+        #     'max_price': 1500,
+        #     'min_price': 250,
+        #     'north': 47.423220,
+        #     'ordering': '-insertion',
+        #     'south': 47.352394,
+        #     'west': 8.477002,
+        # }
+        url_config['west'], url_config['east'] = randomize_map(url_config['west'],
+                                                               url_config['east'],
+                                                               variation=url_randomization['variation'],
+                                                               precision=url_randomization['precision'])
+        url_config['north'], url_config['south'] = randomize_map(url_config['north'],
+                                                               url_config['south'],
+                                                               variation=url_randomization['variation'],
+                                                               precision=url_randomization['precision'])
+        url_config['min_price'] = randomize_price(url_config['min_price'], url_randomization['min_price_variation'])
+        url_config['max_price'] = randomize_price(url_config['max_price'], url_randomization['max_price_variation'])
+
+        url = config['base_url'] + '&'.join([key + config['sep'] + str(val) for key, val in url_config.items()])
+        logger.info(f'usinf flatfox start url {url}')
+        return url
 
 
     def time_since_modified(fname):
@@ -649,6 +677,119 @@ class Scrape:
 
         return dfs
 
+    def process_flatfox(self):
+        # run processing jobs
+
+        dom = self.d["gl"]["current_dom"]
+        stage = 'pr'
+
+        fails = []
+        processed = []
+        df = self.d[stage][dom]['df_attempt']
+
+        dfs = []
+        n_iter = len(df)
+        l = u.Looplogger(n_iter, f'processing {n_iter} entries')
+        intcols = ['brutto', 'netto', 'utilities']
+        dfs = []
+        for i, irow in df.iterrows():
+            try:
+                with open(irow['fname'], 'r', encoding='utf-8') as f_in:
+                    soup = BeautifulSoup(f_in.read(), features="html.parser")
+            except:
+                print(f"could not ingest {irow['fname']}")
+
+            result = {}
+            copycols = ['href', 'domain', 'scrape_ts', 'fname']
+            for col in copycols:
+                result[col] = irow[col]
+
+            titlefield = soup.find('div', attrs={'class': 'widget-listing-title'})
+            result['address'] = u.html_clean_1(titlefield.h2.text).split('-')[0]
+            result['title'] = u.html_clean_1(titlefield.h1.text)
+            tables = soup.find_all('table', attrs={'class': 'table table--rows table--fluid table--fixed table--flush'})
+            if len(tables) != 2:
+                logger.info(f'expected 2 tables, found {len(tables)} for {irow["href"]}, {irow["fname"]}. ignoring')
+                continue
+
+            data = []
+            rows = tables[0].find_all('tr')
+            for row in rows:
+                cols = row.find_all('td')
+                cols = [ele.text.strip() for ele in cols]
+                data.append([ele for ele in cols if ele])  # Get rid of empty values
+            for ele in data:
+                if 'bruttomiete' in ele[0].lower():
+                    result['brutto'] = ele[1]
+                elif 'preiseinheit' in ele[0].lower():
+                    result['price_detail'] = ele[1]
+                elif 'nettomiete' in ele[0].lower():
+                    result['netto'] = ele[1]
+                elif 'nebenkosten' in ele[0].lower():
+                    result['utilities'] = ele[1]
+
+                else:
+                    logger.info(f'unreckognized field {ele[0]} with value {ele[1]} on ad {irow["href"]}')
+
+            data = []
+            rows = tables[1].find_all('tr')
+            for row in rows:
+                cols = row.find_all('td')
+                cols = [ele.text.strip() for ele in cols]
+                data.append([ele for ele in cols if ele])  # Get rid of empty values
+            data
+
+            for ele in data:
+                if 'anzahl zimmer' in ele[0].lower():
+                    result['rooms'] = ele[1]
+                elif 'besonderes' in ele[0].lower():
+                    result['special'] = ele[1]
+                elif 'wohnfläche' in ele[0].lower():
+                    result['area'] = ele[1]
+                elif 'ausstattung' in ele[0].lower():
+                    result['particulars'] = ele[1]
+                elif 'bezugstermin' in ele[0].lower():
+                    result['from'] = ele[1]
+
+                elif 'referenz' in ele[0].lower():
+                    result['reference'] = ele[1]
+                elif 'etage' in ele[0].lower():
+                    result['floor'] = ele[1]
+                elif 'nutzfläche' in ele[0].lower():
+                    result['area_usage'] = ele[1]
+                elif 'baujahr' in ele[0].lower():
+                    result['constructed'] = ele[1]
+                elif 'webseite' in ele[0].lower():
+                    result['website'] = ele[1]
+                elif 'dokumente' in ele[0].lower():
+                    pass
+                elif 'kubatur' in ele[0].lower():
+                    pass
+
+                else:
+                    logger.info(f'unreckognized field {ele[0]} with value {ele[1]} on ad {irow["href"]}')
+
+            for col in intcols:
+                if col in result:
+                    result[col] = u.make_float(result[col])
+
+            if 'brutto' in result:
+                result['rent'] = result['brutto']
+            elif 'netto' in result:
+                result['rent'] = result['netto']
+
+                if 'utilities' in result:
+                    result['rent'] += result['utilities']
+            else:
+                logger.info(f'no rent info can be extracted from {irow["href"]}, {irow["fname"]}')
+
+            a = soup.find_all('div', attrs={'class': 'fui-stack'})[1]
+            result['text'] = re.sub(r"^Beschreibung", "", u.html_clean_1(a.find_all('div')[-2].text))
+            dfs.append(pd.DataFrame(index=[i], data=result))
+
+
+        return dfs
+
     def unify(self):
         # unifies all the per-domain results into a single archive
         stage = 'un'
@@ -768,7 +909,7 @@ class Scrape:
             intro = self.d['an']['email']['intro']
 
             body = result_formatted.hide_index().render()
-            second_table  = old_results.hide_index().render()
+            second_table = old_results.hide_index().render()
 
             msg.attach(MIMEText(intro, 'text'))
             msg.attach(MIMEText(body, 'html'))
@@ -792,7 +933,7 @@ class Scrape:
         logger.info(
             f'analyzed {len(df_bak)} new ads from, found {len(result)} results. saved in {self.d[stage]["lib_out_path"]}')
 
-    logger.info('analyzing completed')
+        logger.info('analyzing completed')
 
 
 def extract_regex_details(text, regex):
@@ -819,3 +960,29 @@ def make_clickable(val):
 class container:
     # dummy class for storing attributes
     pass
+
+
+def flatfox_get_links(driver):
+    # gets the links from a given flatfox results page
+    html_from_page = driver.page_source
+    soup = BeautifulSoup(html_from_page, 'html.parser')
+    adlist = soup.find('div', attrs={'class': 'search-result'})
+    ads = adlist.find_all('div', attrs={'class': 'listing-thumb'})
+    logger.info(f'found {len(ads)} ads')
+    base = 'https://flatfox.ch'
+    links = [base + element.a['href'] for element in ads]
+    return links
+
+
+def randomize_map(east, west, variation=0.01, precision=6):
+    # modifies the flatfox geo-tags by a little bit
+    variation = (east - west) / east * variation
+    new_east = np.round(east * random.uniform(1 + variation, 1 - variation), precision)
+    new_west = np.round(west * random.uniform(1 + variation, 1 - variation), precision)
+    return new_east, new_west
+
+
+def randomize_price(price, variations):
+    'mdifies the flatfox prices abit'
+    return price + random.choice(variations)
+
