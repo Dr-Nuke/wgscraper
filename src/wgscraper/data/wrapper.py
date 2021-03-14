@@ -701,8 +701,9 @@ class Scrape:
 
             result = {}
             copycols = ['href', 'domain', 'scrape_ts', 'fname']
-            for col in copycols:
-                result[col] = irow[col]
+            targetcols = ['url', 'domain', 'scrape_ts', 'fname']
+            for ccol, tcol in zip(copycols,targetcols):
+                result[tcol] = irow[ccol]
 
             titlefield = soup.find('div', attrs={'class': 'widget-listing-title'})
             result['address'] = u.html_clean_1(titlefield.h2.text).split('-')[0]
