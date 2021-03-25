@@ -202,7 +202,7 @@ class Scrape:
                 if 'alt' in element.a.attrs:
                     if 'title' in lib_out.columns:
                         if element.a['alt'] in lib_out['title'].values:
-                            logger.info(f'already scraped: {link}')
+                            # logger.info(f'already scraped: {link}')
                             n_known += 1
                             continue
 
@@ -325,7 +325,7 @@ class Scrape:
 
                     link = 'https://www.wgzimmer.ch' + hrefobj['href']
                     if link in lib_out['href'].values:
-                        logger.info(f'already scraped: {link}')
+                        # logger.info(f'already scraped: {link}')
                         n_known += 1
                         continue
 
