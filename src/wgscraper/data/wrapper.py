@@ -4,24 +4,22 @@ import random
 import re
 import smtplib
 import time
-import numpy as np
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from urllib.parse import urlparse
 from pathlib import Path
+from urllib.parse import urlparse
 
 import dateparser
+import numpy as np
 import pandas as pd
 import requests
 import utils.utils as u
 from bs4 import BeautifulSoup
 from loguru import logger
 from selenium import webdriver
+from selenium.webdriver import DesiredCapabilities
 from selenium.webdriver.firefox.options import Options
 from selenium.webdriver.support.ui import Select
-from selenium.webdriver.firefox.firefox_profile import FirefoxProfile
-from selenium.webdriver import DesiredCapabilities
-from selenium.webdriver import Firefox
 
 
 # this is the wrapper filefor the scraper project
@@ -403,11 +401,11 @@ class Scrape:
             button_clicks += 1
             # last = u.wait_minimum(abs(random.gauss(1, 1)) + 5, last)
             logger.info(f'moving to {button_clicks} extensions of results page')
-            time.sleep(5) # let the webpage load, otherwise we won't find the buttons
+            time.sleep(5)  # let the webpage load, otherwise we won't find the buttons
             buttons = self.d['sc']['driver'].find_elements_by_css_selector('.button.button--primary')
             logger.info(f'found {len(buttons)} buttons')
             buttons[1].click()
-            time.sleep(5) # more loading time, otherwise we miss out links
+            time.sleep(5)  # more loading time, otherwise we miss out links
 
             # find all inks on the page
             found_links = flatfox_get_links(self.d['sc']['driver'])
@@ -457,16 +455,15 @@ class Scrape:
                                                                variation=url_randomization['variation'],
                                                                precision=url_randomization['precision'])
         url_config['north'], url_config['south'] = randomize_map(url_config['north'],
-                                                               url_config['south'],
-                                                               variation=url_randomization['variation'],
-                                                               precision=url_randomization['precision'])
+                                                                 url_config['south'],
+                                                                 variation=url_randomization['variation'],
+                                                                 precision=url_randomization['precision'])
         url_config['min_price'] = randomize_price(url_config['min_price'], url_randomization['min_price_variation'])
         url_config['max_price'] = randomize_price(url_config['max_price'], url_randomization['max_price_variation'])
 
         url = config['base_url'] + '&'.join([key + config['sep'] + str(val) for key, val in url_config.items()])
         logger.info(f'usinf flatfox start url {url}')
         return url
-
 
     def time_since_modified(fname):
         if os.path.isfile(fname):
@@ -702,7 +699,7 @@ class Scrape:
             result = {}
             copycols = ['href', 'domain', 'scrape_ts', 'fname']
             targetcols = ['url', 'domain', 'scrape_ts', 'fname']
-            for ccol, tcol in zip(copycols,targetcols):
+            for ccol, tcol in zip(copycols, targetcols):
                 result[tcol] = irow[ccol]
 
             titlefield = soup.find('div', attrs={'class': 'widget-listing-title'})
@@ -787,7 +784,6 @@ class Scrape:
             a = soup.find_all('div', attrs={'class': 'fui-stack'})[1]
             result['text'] = re.sub(r"^Beschreibung", "", u.html_clean_1(a.find_all('div')[-2].text))
             dfs.append(pd.DataFrame(index=[i], data=result))
-
 
         return dfs
 
@@ -883,20 +879,25 @@ class Scrape:
         result = pd.concat(results).drop_duplicates(subset=['title'])
 
         # write results
+        now = datetime.datetime.now()
+        cutoff = now - datetime.timedelta(days=60)
         if len(result) > 0:
             all_results = pd.concat([former_results, result])
             self.d[stage]['results_df'] = all_results
             all_results.to_csv(self.d['an']['results_archive_path'], index=False)
 
             # make email
-            result = result[['rent', 'url', 'address', 'rooms', 'title', 'searchterm', 'searchfield', 'scrape_ts']]
+            result = result[
+                ['rent', 'url', 'address', 'rooms', 'title', 'domain', 'searchterm', 'searchfield', 'scrape_ts']]
             result_formatted = result.sort_values(by='scrape_ts', ascending=False).style.format({'url': make_clickable})
 
             if len(former_results) > 0:
                 old_results = former_results[
-                    ['rent', 'url', 'address', 'rooms', 'title', 'searchterm', 'searchfield', 'scrape_ts']]
+                    ['rent', 'url', 'address', 'rooms', 'title', 'domain', 'searchterm', 'searchfield', 'scrape_ts']]
+                old_results = old_results[old_results['scrape_ts'] > cutoff]
                 old_results = old_results.sort_values(by='scrape_ts', ascending=False).style.format(
                     {'url': make_clickable})
+
             else:
                 old_results = pd.DataFrame().style.format({'url': make_clickable})
 
@@ -986,4 +987,3 @@ def randomize_map(east, west, variation=0.01, precision=6):
 def randomize_price(price, variations):
     'mdifies the flatfox prices abit'
     return price + random.choice(variations)
-
