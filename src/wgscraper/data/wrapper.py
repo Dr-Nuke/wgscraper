@@ -396,7 +396,6 @@ class Scrape:
 
             # click the button
             button_clicks += 1
-            # last = u.wait_minimum(abs(random.gauss(1, 1)) + 5, last)
             logger.info(f'moving to {button_clicks} extensions of results page')
             time.sleep(5)  # let the webpage load, otherwise we won't find the buttons
             buttons = self.d['sc']['driver'].find_elements_by_css_selector('.button.button--primary')
@@ -728,7 +727,7 @@ class Scrape:
                 cols = row.find_all('td')
                 cols = [ele.text.strip() for ele in cols]
                 data.append([ele for ele in cols if ele])  # Get rid of empty values
-            data
+
 
             for ele in data:
                 if 'anzahl zimmer' in ele[0].lower():
