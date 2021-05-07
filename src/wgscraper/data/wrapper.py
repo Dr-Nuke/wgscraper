@@ -94,7 +94,6 @@ class Scrape:
         options = Options()
         options.headless = False
 
-        # options.headless = False  # Todo: remove debug line
         options.add_argument('--window-size=1920,1080')
         profile = webdriver.FirefoxProfile(
             str(Path(r'C:\Users\Bo-user\AppData\Local\Mozilla\Firefox\Profiles\ewyg9dd9.Hans')))
@@ -230,8 +229,6 @@ class Scrape:
         # this is universal for all domains
         logger.info(f'scraping adpage: {url}')
         now = datetime.datetime.now()
-        # self.d['sc']['driver'].get(url)
-        # content = self.d['sc']['driver'].page_source  # this is one big string of webpage html
         content = requests.get(url)
         if not content.status_code == 200:  # if fist time fails, try again ew times
             for i in range(3):
@@ -554,8 +551,6 @@ class Scrape:
         n_iter = len(df)
         l = u.Looplogger(n_iter, f'processing {n_iter} entries')
         for i, row in df.iterrows():
-            # if i > 10:
-            #     break # debug
             l.log(i)
             try:
                 with open(row['fname'], 'r', encoding='utf-8') as f_in:
@@ -596,8 +591,6 @@ class Scrape:
         n_iter = len(df)
         l = u.Looplogger(n_iter, f'processing {n_iter} entries')
         for i, row in df.iterrows():
-            # if i > 10:
-            #     break  # debug
             l.log(i)
             try:
                 with open(row['fname'], 'r', encoding='utf-8') as f_in:
@@ -821,6 +814,7 @@ class Scrape:
         self.d[stage]['lib_out'] = lib_out
 
         former_results = u.load_df_safely(self.d[stage]['results_archive_path'])
+        former_results['scrape_ts'] = pd.to_datetime(former_results['scrape_ts'])
         self.d[stage]['former_results'] = former_results
 
         logger.info(f'found {len(lib_in)} existing entries in {self.d[stage]["lib_in_path"]}')
@@ -847,7 +841,6 @@ class Scrape:
         # make a copy for later
         df_bak = df
 
-        # process the pending data for the ronorp domain
         if len(df) == 0:
             logger.info(f'no entries for to analyze')
             return
