@@ -24,4 +24,4 @@ dependencies:
   - setuptools
   - wheel
   - twine
-prefix: C:\ProgramData\Anaconda3\envs\wgscraper
+  
